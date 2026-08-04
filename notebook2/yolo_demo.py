@@ -13,7 +13,7 @@ except Exception as e:
 # The user's target mapping is 0-7, but this BDD100K model has its own mapping.
 # We will just print what the model detects.
 
-video_path = 'traffic_light.mp4'
+video_path = 'dashcam_real.mp4'
 cap = cv2.VideoCapture(video_path)
 
 if not cap.isOpened():
@@ -24,8 +24,8 @@ width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
 height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
 fps = int(cap.get(cv2.CAP_PROP_FPS))
 
-# Limit to 20 seconds
-max_frames = fps * 20
+# Limit to 60 seconds
+max_frames = fps * 60
 frame_count = 0
 
 out = cv2.VideoWriter('output_yolo.mp4', cv2.VideoWriter_fourcc(*'mp4v'), fps, (width, height))
