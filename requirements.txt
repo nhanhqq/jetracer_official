@@ -1,0 +1,20 @@
+# Requirements for Jetson AI Racer Challenge 2026
+# Môi trường: Jetpack 4.5.1, Python 3.6.9, CUDA 10.2
+
+# ROS1 Melodic Python3 Bridge dependencies (giúp Python3 giao tiếp với ROS1)
+rospkg==1.4.0
+catkin_pkg==0.4.24
+pyyaml==5.4.1
+
+# Các thư viện xử lý ảnh, tính toán (một số có sẵn trong system, cài thêm để đảm bảo)
+Pillow==8.4.0
+numpy==1.19.5
+scipy==1.5.4
+matplotlib==3.3.4
+
+# Thư viện ghi log dữ liệu (để lưu file txt/csv theo yêu cầu đề bài)
+pandas==1.1.5
+
+# LƯU Ý QUAN TRỌNG:
+# 1. OpenCV, TensorRT, CUDA đã có sẵn trong system-site-packages của Jetpack, không cài qua pip ở đây.
+# 2. PyTorch và Torchvision trên Jetson NANO cần cài thông qua file .whl do NVIDIA cung cấp dành riêng cho Jetpack 4.5.1 (thường là PyTorch 1.x), không cài trực tiếp bằng pip install torch.
