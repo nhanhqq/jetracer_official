@@ -4,8 +4,8 @@ import sys
 from ultralytics import YOLO
 
 def main():
-    pt_path = 'yolov8-bdd100k-weights/best.pt'
-    trt_path = 'yolov8-bdd100k-weights/best.engine'
+    pt_path = 'best.pt'
+    trt_path = 'best.engine'
 
     # Kiểm tra xem file weights gốc có tồn tại không
     if not os.path.exists(pt_path):
