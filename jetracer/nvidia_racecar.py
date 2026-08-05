@@ -17,11 +17,18 @@ class NvidiaRacecar(Racecar):
         self.kit = ServoKit(channels=16, address=self.i2c_address)
         self.steering_motor = self.kit.continuous_servo[self.steering_channel]
         self.throttle_motor = self.kit.continuous_servo[self.throttle_channel]
+        # Force initial motor positions to neutral
+        self._on_steering()
+        self._on_throttle()
     
-    @traitlets.observe('steering')
-    def _on_steering(self, change):
-        self.steering_motor.throttle = change['new'] * self.steering_gain + self.steering_offset
+    @traitlets.observe('steering', 'steering_gain', 'steering_offset')
+    def _on_steering(self, change=None):
+        val = self.steering * self.steering_gain + self.steering_offset
+        # Clamp to [-1.0, 1.0] to prevent ServoKit ValueError exception
+        self.steering_motor.throttle = max(-1.0, min(1.0, float(val)))
     
-    @traitlets.observe('throttle')
-    def _on_throttle(self, change):
-        self.throttle_motor.throttle = change['new'] * self.throttle_gain
+    @traitlets.observe('throttle', 'throttle_gain')
+    def _on_throttle(self, change=None):
+        val = self.throttle * self.throttle_gain
+        # Clamp to [-1.0, 1.0] to prevent ServoKit ValueError exception
+        self.throttle_motor.throttle = max(-1.0, min(1.0, float(val)))
