@@ -1,0 +1,7 @@
+ultralytics>=8.4.0
+numpy
+opencv-python
+PyYAML
+# Export/host validation of the Jetson Nano graph (not required by TensorRT runtime):
+onnx>=1.12,<1.17
+onnxruntime>=1.15,<1.20

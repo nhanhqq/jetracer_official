@@ -1,0 +1,52 @@
+camera:
+  width: 224
+  height: 224
+  capture_fps: 60
+
+models:
+  # A single YOLO26-seg model returns masks and their detection boxes.
+  lane: artifacts/lane_yolo26n_seg_nano_fp16.engine
+  lane_pt_fallback: artifacts/lane_yolo26n_seg_best.pt
+  imgsz: 224
+  confidence: 0.35
+  device: "0"
+
+classes:
+  road: [road, drivable_area]
+  divider: [divider, center_line, lane_divider]
+  obstacle: [obstacle]
+
+tracking:
+  target_mode: divider       # keep camera centre on the physical divider
+  lookahead_ratio: 0.62
+  bottom_ratio: 0.93
+  roi_top_ratio: 0.45
+  min_mask_pixels: 35
+  confidence_ema: 0.35
+  max_lost_frames: 3
+
+control:
+  steering_gain: -0.65       # hardware calibration, inherited from notebook3
+  steering_offset: 0.0
+  throttle_gain: 0.8
+  kp: 0.92
+  ki: 0.02
+  kd: 0.10
+  heading_gain: 0.42
+  max_steering: 0.82
+  max_steering_step: 0.16
+  throttle_min: 0.09
+  throttle_cruise: 0.18
+  throttle_max: 0.24
+  throttle_step_up: 0.008
+  throttle_step_down: 0.035
+  curve_slowdown: 0.62
+  low_confidence_slowdown: 0.55
+  emergency_obstacle_ratio: 0.78
+  obstacle_slow_ratio: 0.58
+
+runtime:
+  log_dir: logs
+  log_every: 10
+  display: false
+  dry_run: true
