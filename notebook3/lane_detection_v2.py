@@ -105,6 +105,19 @@ class LaneDetector:
         self.max_heading_preview_px = 72
         self.max_target_step_px = 28
 
+        # Follow the bright dashed divider with the camera mounted over it.
+        # This is the primary signal on the real car; road-edge midpoint logic
+        # remains available as fallback and for obstacle geometry.
+        self.follow_centerline = True
+        self.centerline_deadband_px = 3
+        self.centerline_max_jump_px = 30
+        self.centerline_history_frames = 5
+        self.last_centerline_x = None
+        self.centerline_lost_frames = 0
+        self._previous_steering_error = 0.0
+        self.steering_kp = 1.35
+        self.steering_kd = 0.22
+
         # === Smoothing / History ===
         self.steering_history   = deque(maxlen=7)
         self.left_x_history     = deque(maxlen=5)
@@ -135,6 +148,74 @@ class LaneDetector:
 
         # === Debug ===
         self._debug_masks = {}
+
+    def calculate_centerline_target(self, center_mask, img_width, img_height):
+        """Return the look-ahead x of the bright dashed centre divider."""
+        y_min = int(img_height * 0.52)
+        tracking_mask = center_mask.copy()
+        tracking_mask[:y_min, :] = 0
+        contours, _ = cv2.findContours(
+            tracking_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE
+        )
+        expected_x = (float(self.last_centerline_x)
+                      if self.last_centerline_x is not None
+                      else img_width / 2.0)
+        candidates = []
+        for contour in contours:
+            area = cv2.contourArea(contour)
+            if area < 10:
+                continue
+            x, y, cw, ch = cv2.boundingRect(contour)
+            cx = x + cw / 2.0
+            distance = abs(cx - expected_x)
+            # Wide white patches are glare, not a lane marking.
+            if cw > img_width * 0.20 or ch < 3:
+                continue
+            if self.last_centerline_x is not None and distance > self.centerline_max_jump_px:
+                continue
+            score = area * (1.0 + y / float(img_height)) / (1.0 + 0.08 * distance)
+            candidates.append((score, contour))
+
+        if not candidates:
+            self.centerline_lost_frames += 1
+            if (self.last_centerline_x is not None and
+                    self.centerline_lost_frames <= self.centerline_history_frames):
+                return int(round(self.last_centerline_x)), False, "centerline:history"
+            return None, False, "centerline:lost"
+
+        candidates.sort(key=lambda item: item[0], reverse=True)
+        seed = candidates[0][1]
+        sx, _, sw, _ = cv2.boundingRect(seed)
+        seed_x = sx + sw / 2.0
+        selected = []
+        for _, contour in candidates:
+            x, _, cw, _ = cv2.boundingRect(contour)
+            if abs((x + cw / 2.0) - seed_x) <= 24:
+                selected.append(contour.reshape(-1, 2))
+        points = np.concatenate(selected, axis=0)
+        ys = points[:, 1].astype(np.float32)
+        xs = points[:, 0].astype(np.float32)
+
+        lookahead_y = float(img_height * 0.68)
+        if len(points) >= 12 and float(np.ptp(ys)) >= 8.0:
+            slope, intercept = np.polyfit(ys, xs, 1)
+            line_x = float(slope * lookahead_y + intercept)
+        else:
+            line_x = float(np.median(xs))
+        line_x = float(np.clip(line_x, self.safety_margin_px,
+                               img_width - self.safety_margin_px))
+
+        if self.last_centerline_x is not None:
+            line_x = float(np.clip(
+                line_x,
+                self.last_centerline_x - self.centerline_max_jump_px,
+                self.last_centerline_x + self.centerline_max_jump_px,
+            ))
+            line_x = 0.62 * line_x + 0.38 * self.last_centerline_x
+
+        self.last_centerline_x = line_x
+        self.centerline_lost_frames = 0
+        return int(round(line_x)), True, "centerline:locked"
 
     # =========================================================================
     # PREPROCESSING
@@ -1087,12 +1168,19 @@ class LaneDetector:
     def calculate_steering(self, target_x, img_width):
         """Tính steering [-1, 1] từ target_x; target is already lane-safe."""
 
-        steering = (target_x / (img_width / 2.0)) - 1.0
-        self.steering_history.append(steering)
+        error_px = float(target_x) - img_width / 2.0
+        if abs(error_px) <= self.centerline_deadband_px:
+            error_px = 0.0
+        normalized_error = error_px / (img_width / 2.0)
+        derivative = normalized_error - self._previous_steering_error
+        self._previous_steering_error = normalized_error
+        steering = self.steering_kp * normalized_error + self.steering_kd * derivative
 
-        weights = np.linspace(0.4, 1.0, len(self.steering_history))
-        smooth  = float(np.average(list(self.steering_history), weights=weights))
-        smooth  = max(-1.0, min(1.0, smooth))
+        # React faster than the previous seven-frame weighted average.
+        previous = self.steering_history[-1] if self.steering_history else steering
+        smooth = 0.58 * steering + 0.42 * previous
+        self.steering_history.append(smooth)
+        smooth = max(-1.0, min(1.0, float(smooth)))
 
         return smooth, target_x
 
@@ -1133,6 +1221,12 @@ class LaneDetector:
 
         # 5. Detect center divider (trắng/đứt đoạn) — bổ sung vào combined mask.
         center_mask = self.detect_center_mask(roi_enhanced, road_mask, color_boundary_mask)
+        # On the real track the dashed divider is bright red/orange, while some
+        # layouts use white. Track both; temporal proximity to image centre
+        # distinguishes the divider from the outer red/orange road edges.
+        centerline_mask = cv2.bitwise_or(center_mask, color_boundary_mask)
+        centerline_target_x, centerline_locked, centerline_case = \
+            self.calculate_centerline_target(centerline_mask, w, h)
 
         # 6. Calculate lane positions
         (target_x, left_x, right_x, center_x,
@@ -1146,6 +1240,10 @@ class LaneDetector:
         # uses the adjacent detected corridor, then holds it until the obstacle
         # has genuinely cleared instead of steering back and forth every frame.
         lane_target_x, lane_action = self.plan_lane_target(target_x, stable_obs, w)
+        if self.follow_centerline and centerline_target_x is not None:
+            lane_target_x = centerline_target_x
+            lane_action = "follow:centerline"
+            case_used = centerline_case
         steering, adj_target_x = self.calculate_steering(lane_target_x, w)
         case_used = f"{case_used}|{lane_action}"
 
@@ -1166,6 +1264,7 @@ class LaneDetector:
             'center':   center_mask,
             'road':     road_mask,
             'generic_lane': generic_lane_mask,
+            'centerline': centerline_mask,
         }
 
         info = {
@@ -1174,6 +1273,8 @@ class LaneDetector:
             'left_x':             left_x,
             'right_x':            right_x,
             'center_x':           center_x,
+            'centerline_x':       centerline_target_x,
+            'centerline_locked':  centerline_locked,
             'case':               case_used,
             'lane_action':        lane_action,
             'active_lane_pair':   self.active_lane_pair,
@@ -1181,7 +1282,12 @@ class LaneDetector:
             # The caller can stop the motor if markings are gone for this long.
             # Three frames tolerates a dashed line while still failing safe
             # before the car can leave the board.
-            'lane_confident':     self.active_lane_pair is not None and self.frames_lost <= 3,
+            'lane_confident':     (
+                self.last_centerline_x is not None and
+                self.centerline_lost_frames <= self.centerline_history_frames
+                if self.follow_centerline else
+                self.active_lane_pair is not None and self.frames_lost <= 3
+            ),
             'obstacle':           stable_obs,
             'frames_lost':        self.frames_lost,
             'mask_boundary':      boundary_mask,
