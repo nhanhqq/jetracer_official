@@ -888,6 +888,16 @@ class LaneDetector:
     def detect_obstacle(self, roi_img, boundary_mask, center_mask, road_mask=None):
         """Phát hiện vật cản trên đường bằng edge detection."""
         h, w = roi_img.shape[:2]
+        hsv_obs = cv2.cvtColor(roi_img, cv2.COLOR_BGR2HSV)
+        sat_obs = hsv_obs[:, :, 1]
+        val_obs = hsv_obs[:, :, 2]
+        if road_mask is not None and cv2.countNonZero(road_mask) > 50:
+            road_pixels = road_mask > 0
+            road_median_v = float(np.median(val_obs[road_pixels]))
+            road_median_s = float(np.median(sat_obs[road_pixels]))
+        else:
+            road_median_v = float(np.median(val_obs))
+            road_median_s = float(np.median(sat_obs))
         gray    = cv2.cvtColor(roi_img, cv2.COLOR_BGR2GRAY)
         blurred = cv2.GaussianBlur(gray, (5, 5), 0)
         edges   = cv2.Canny(blurred, 40, 120)
@@ -929,17 +939,41 @@ class LaneDetector:
                 fill_ratio = area / (bbox_area + 1)
                 if fill_ratio < 0.15:
                     continue
+
+                # Floor seams, wrinkles and reflections create closed Canny
+                # contours but have almost the same appearance as the road.
+                # A physical obstacle must also form a photometrically distinct
+                # region.  This keeps white cups/cones and dark/coloured objects
+                # while rejecting the grey vinyl texture seen in test videos.
+                contour_mask = np.zeros((h, w), dtype=np.uint8)
+                cv2.drawContours(contour_mask, [cnt], -1, 255, -1)
+                mean_v = float(cv2.mean(val_obs, mask=contour_mask)[0])
+                mean_s = float(cv2.mean(sat_obs, mask=contour_mask)[0])
+                value_contrast = abs(mean_v - road_median_v)
+                saturation_contrast = mean_s - road_median_s
+                if value_contrast < 24 and saturation_contrast < 28:
+                    continue
                 obstacles.append({
                     'x': x, 'y': y, 'w': cw, 'h': ch,
                     'center_x': cx_obs, 'center_y': cy_obs,
-                    'area': bbox_area
+                    'area': bbox_area,
+                    'contrast': max(value_contrast, saturation_contrast),
                 })
 
         obstacles.sort(key=lambda o: o['area'], reverse=True)
 
-        self.obstacle_history.append(obstacles[0] if obstacles else None)
-        valid_count    = sum(1 for o in self.obstacle_history if o is not None)
-        stable_obstacle = obstacles[0] if (valid_count >= 2 and obstacles) else None
+        current = obstacles[0] if obstacles else None
+        self.obstacle_history.append(current)
+        stable_obstacle = None
+        if current is not None:
+            matching_history = [
+                previous for previous in self.obstacle_history
+                if previous is not None and
+                abs(previous['center_x'] - current['center_x']) <= 26 and
+                abs(previous['center_y'] - current['center_y']) <= 30
+            ]
+            if len(matching_history) >= 2:
+                stable_obstacle = current
 
         return stable_obstacle, obstacles
 

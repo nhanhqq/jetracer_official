@@ -1,0 +1,16 @@
+{
+  "input": "D:\\jetracer_official\\notebook3\\test\\1786085420908_202326730929621029_7442541399315262114.mp4",
+  "output": "D:\\jetracer_official\\notebook3\\test\\1786085420908_202326730929621029_7442541399315262114_inference.mp4",
+  "frames": 498,
+  "source_fps": 29.94,
+  "duration_s": 16.633,
+  "lane_confident_ratio": 1.0,
+  "obstacle_frame_ratio": 0.0141,
+  "left_turn_frame_ratio": 0.3715,
+  "right_turn_frame_ratio": 0.4016,
+  "mean_abs_steering": 0.3636,
+  "target_jumps_over_45px": 6,
+  "mean_latency_ms": 27.439,
+  "offline_pipeline_fps": 23.72,
+  "uses_manual_labels": false
+}
