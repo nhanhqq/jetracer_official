@@ -23,6 +23,9 @@ import time
 current_dir = os.path.dirname(os.path.abspath(__file__))
 if current_dir not in sys.path:
     sys.path.insert(0, current_dir)
+project_dir = os.path.abspath(os.path.join(current_dir, '..'))
+if project_dir not in sys.path:
+    sys.path.insert(0, project_dir)
 
 from lane_detection_v2 import LaneDetector
 
@@ -46,10 +49,15 @@ def create_debug_frame(original, result, mask_boundary, mask_center, steering, i
     mask_b_full = np.zeros((h, w), dtype=np.uint8)
     mask_c_full = np.zeros((h, w), dtype=np.uint8)
 
-    if mask_boundary.shape[0] == roi_h:
+    if mask_boundary.shape[0] == h:
+        mask_b_full = mask_boundary[:, :, 1] if len(mask_boundary.shape) == 3 else mask_boundary
+    elif mask_boundary.shape[0] == roi_h:
         mask_b_full[roi_top:h, :] = mask_boundary[:, :, 1] if len(mask_boundary.shape) == 3 else mask_boundary
-    if mask_center.shape[0] == roi_h:
-        mask_c_full[roi_top:h, :] = mask_center[:, :, 2] if len(mask_center.shape) == 3 else mask_center
+    if mask_center.shape[0] == h:
+        # process_frame_with_masks emits centre mask as cyan (B + G).
+        mask_c_full = mask_center[:, :, 0] if len(mask_center.shape) == 3 else mask_center
+    elif mask_center.shape[0] == roi_h:
+        mask_c_full[roi_top:h, :] = mask_center[:, :, 0] if len(mask_center.shape) == 3 else mask_center
 
     # Tạo colored masks
     mask_b_color = np.zeros((h, w, 3), dtype=np.uint8)
@@ -95,12 +103,12 @@ def create_debug_frame(original, result, mask_boundary, mask_center, steering, i
 
 def main():
     # --- Configuration ---
-    dataset_dir = '/home/jetson/jetracer_official/notebook3/road_following_A/apex'
-    output_dir = '/home/jetson/jetracer_official/notebook3'
+    dataset_dir = os.path.join(current_dir, 'road_following_A', 'apex')
+    output_dir = project_dir
 
-    raw_video_path = os.path.join(output_dir, 'dataset_raw.mp4')
-    lane_video_path = os.path.join(output_dir, 'dataset_lane_v2.mp4')
-    debug_video_path = os.path.join(output_dir, 'dataset_debug_v2.mp4')
+    raw_video_path = os.path.join(output_dir, 'lane_demo_raw.mp4')
+    lane_video_path = os.path.join(output_dir, 'lane_demo_tracking.mp4')
+    debug_video_path = os.path.join(output_dir, 'lane_demo_debug.mp4')
 
     fps = 10.0  # FPS cho video output
 

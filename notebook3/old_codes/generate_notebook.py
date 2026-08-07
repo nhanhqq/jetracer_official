@@ -18,7 +18,14 @@ from IPython.display import display
 from jetcam.csi_camera import CSICamera
 from jetcam.utils import bgr8_to_jpeg
 from basic_motion import JetRacerController
-from lane_detection_v2 import get_detector
+import importlib
+import lane_detection_v2
+
+# Reload on each notebook initialisation so the latest lane logic is used even
+# when the Jupyter kernel has already imported an older version.
+lane_detection_v2 = importlib.reload(lane_detection_v2)
+get_detector = lane_detection_v2.get_detector
+print('Lane detector loaded: nearest-corridor lane tracking')
 
 # Restart NVArgus Daemon
 os.system('echo "jetson" | sudo -S systemctl restart nvargus-daemon')
@@ -97,8 +104,16 @@ def live_update(change):
     steering = max(min(steering, 1.0), -1.0)
     throttle = throttle_slider.value
     
-    car.set_steering(steering)
-    car.set_throttle(throttle)
+    # Fail safe: stop instead of continuing with a stale steering command when
+    # both boundaries have been missing for several consecutive frames.
+    lane_confident = info.get('lane_confident', False)
+    if lane_confident:
+        car.set_steering(steering)
+        car.set_throttle(throttle)
+    else:
+        steering = 0.0
+        throttle = 0.0
+        car.stop()
     
     # Display Update
     raw_widget.value = bgr8_to_jpeg(img)
@@ -107,7 +122,8 @@ def live_update(change):
     # Log to CSV
     obstacle = info.get('obstacle')
     detected_obj = 'Obstacle' if obstacle else 'Lane'
-    decision = 'Avoid Obstacle' if obstacle else 'Follow Lane'
+    decision = ('Lane Lost - Stop' if not lane_confident else
+                ('Avoid Obstacle' if obstacle else 'Follow Lane'))
     control_out = f"S:{steering:.2f} T:{throttle:.2f}"
     event = info.get('case', '')
     
