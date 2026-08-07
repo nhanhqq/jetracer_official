@@ -1,0 +1,30 @@
+{
+  "dark": {
+    "mean_delta_from_clean_px": 13.87,
+    "p90_delta_from_clean_px": 36.8,
+    "max_delta_from_clean_px": 55,
+    "confidence_ratio": 1.0,
+    "jumps_over_45px": 0
+  },
+  "bright": {
+    "mean_delta_from_clean_px": 21.293,
+    "p90_delta_from_clean_px": 51.0,
+    "max_delta_from_clean_px": 124,
+    "confidence_ratio": 1.0,
+    "jumps_over_45px": 0
+  },
+  "flicker": {
+    "mean_delta_from_clean_px": 15.446,
+    "p90_delta_from_clean_px": 41.9,
+    "max_delta_from_clean_px": 97,
+    "confidence_ratio": 1.0,
+    "jumps_over_45px": 0
+  },
+  "glare": {
+    "mean_delta_from_clean_px": 19.5,
+    "p90_delta_from_clean_px": 56.0,
+    "max_delta_from_clean_px": 76,
+    "confidence_ratio": 1.0,
+    "jumps_over_45px": 0
+  }
+}

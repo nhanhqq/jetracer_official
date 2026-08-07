@@ -98,6 +98,12 @@ class LaneDetector:
         self.max_lane_width_px = 150
         self.default_lane_width_px = 74
         self.safety_margin_px = 16
+        # Pure-pursuit style preview.  On a bend, following only the midpoint
+        # at one row reacts too late; project the corridor heading farther into
+        # the turn while keeping the final point inside the image safety band.
+        self.heading_preview_gain = 3.0
+        self.max_heading_preview_px = 72
+        self.max_target_step_px = 28
 
         # === Smoothing / History ===
         self.steering_history   = deque(maxlen=7)
@@ -123,7 +129,9 @@ class LaneDetector:
         self.lane_pair_match_px = 24
         self.lane_switch_state = None
         self.obstacle_clear_frames = 0
-        self.return_after_clear_frames = 8
+        # At 20 FPS this is ~0.9 s: enough time to pass the obstacle before
+        # trying to merge back, instead of oscillating immediately.
+        self.return_after_clear_frames = 18
 
         # === Debug ===
         self._debug_masks = {}
@@ -185,7 +193,14 @@ class LaneDetector:
 
         # Road là vùng tối hơn nền/lề sáng. Nới saturation để chấp nhận road hơi xanh/xám
         # dưới ánh đèn, nhưng loại vùng trắng/sáng ngoài đường.
-        road_mask = ((val < 172) & (sat < 175)).astype(np.uint8) * 255
+        # Exposure-adaptive value ceiling.  A fixed V threshold makes the road
+        # vanish when overhead lights flare or the camera auto-exposure jumps.
+        trap_values = val[trap_mask > 0]
+        if trap_values.size:
+            road_v_limit = int(np.clip(np.percentile(trap_values, 68) + 28, 160, 205))
+        else:
+            road_v_limit = 172
+        road_mask = ((val < road_v_limit) & (sat < 175)).astype(np.uint8) * 255
         road_mask = cv2.bitwise_and(road_mask, trap_mask)
 
         k5 = np.ones((5, 5), np.uint8)
@@ -433,6 +448,14 @@ class LaneDetector:
     # LANE LINE POSITION EXTRACTION — Hough-based approach
     # =========================================================================
 
+    @staticmethod
+    def _line_coords(line):
+        """Return x1, y1, x2, y2 for both OpenCV Hough output layouts."""
+        coords = np.asarray(line).reshape(-1)
+        if coords.size != 4:
+            raise ValueError("Invalid Hough line shape: %r" % (np.asarray(line).shape,))
+        return tuple(int(value) for value in coords)
+
     def extract_lane_lines(self, mask, img_width, side='both'):
         """
         Tìm vị trí lane line từ mask bằng Hough Transform.
@@ -459,7 +482,7 @@ class LaneDetector:
         mid_x = img_width // 2
 
         for line in lines:
-            x1, y1, x2, y2 = line[0]
+            x1, y1, x2, y2 = self._line_coords(line)
             if x1 == x2:
                 continue
 
@@ -502,7 +525,7 @@ class LaneDetector:
         xs = []
         ws = []
         for line, slope, length in lines:
-            x1, y1, x2, y2 = line[0]
+            x1, y1, x2, y2 = self._line_coords(line)
             if abs(slope) > 0.05:
                 x_at_y = x1 + (target_y - y1) / (slope + 1e-8)
             else:
@@ -564,7 +587,7 @@ class LaneDetector:
         near_y = int(roi_h * 0.84)
         if lines is not None:
             for line in lines:
-                x1, y1, x2, y2 = line[0]
+                x1, y1, x2, y2 = self._line_coords(line)
                 dx = x2 - x1
                 dy = y2 - y1
                 if abs(dx) < 2:
@@ -797,7 +820,43 @@ class LaneDetector:
                 target_x = int(self.last_target_x)
                 case_used = "generic:history_target"
 
+        # Curve anticipation: estimate how the selected physical corridor moves
+        # from the near field to the look-ahead row.  This preserves lane-pair
+        # identity but starts steering before the car reaches a left/right bend.
+        if left_x is not None and right_x is not None and line_geometries:
+            def matching_near_x(boundary_x):
+                matches = [(xn, length) for xt, xn, length in line_geometries
+                           if abs(xt - boundary_x) <= 24]
+                if not matches:
+                    return None
+                xs, weights = zip(*matches)
+                return float(np.average(xs, weights=weights))
+
+            near_left_x = matching_near_x(left_x)
+            near_right_x = matching_near_x(right_x)
+            shifts = []
+            if near_left_x is not None:
+                shifts.append(float(left_x) - near_left_x)
+            if near_right_x is not None:
+                shifts.append(float(right_x) - near_right_x)
+            if shifts:
+                # Median is robust when glare contributes a stray Hough segment
+                # to one boundary.  A single genuine boundary still works on a
+                # dashed-line gap or when the outside shoulder leaves the frame.
+                heading_shift = float(np.median(shifts))
+                preview = np.clip(self.heading_preview_gain * heading_shift,
+                                  -self.max_heading_preview_px,
+                                  self.max_heading_preview_px)
+                target_x = int(round(target_x + preview))
+                case_used += ":curve"
+
         target_x = max(self.safety_margin_px, min(roi_w - self.safety_margin_px, int(target_x)))
+        # A real lane cannot teleport laterally between adjacent camera frames.
+        # Clamp isolated glare/reflection spikes before they reach steering.
+        if self.last_target_x is not None and self.frames_lost == 0:
+            target_x = int(np.clip(target_x,
+                                   self.last_target_x - self.max_target_step_px,
+                                   self.last_target_x + self.max_target_step_px))
         self.last_target_x = target_x
 
         # Phân line để debug màu trái/phải/giữa.
@@ -1132,15 +1191,15 @@ class LaneDetector:
 
         # --- Vẽ Hough lines ---
         for line, slope, length in left_lines:
-            x1, y1, x2, y2 = line[0]
+            x1, y1, x2, y2 = self._line_coords(line)
             cv2.line(overlay, (x1, y1), (x2, y2), (255, 80, 0), 2)   # Blue = left boundary
 
         for line, slope, length in right_lines:
-            x1, y1, x2, y2 = line[0]
+            x1, y1, x2, y2 = self._line_coords(line)
             cv2.line(overlay, (x1, y1), (x2, y2), (0, 80, 255), 2)   # Red = right boundary
 
         for line, slope, length in center_lines:
-            x1, y1, x2, y2 = line[0]
+            x1, y1, x2, y2 = self._line_coords(line)
             cv2.line(overlay, (x1, y1), (x2, y2), (0, 200, 200), 2)  # Yellow = center
 
         # --- Lane position dots ---
@@ -1293,7 +1352,7 @@ if __name__ == '__main__':
 
         fname = os.path.basename(img_path)
         parts = fname.split('_')
-        gt_x = 112 + int(parts[0])  # Ground truth apex x
+        gt_x = int(parts[0])  # XYDataset stores the clicked apex in pixels.
         err  = abs(info['target_x'] - gt_x) if info['target_x'] else 'N/A'
 
         print(f"  [{i+1:3d}] {fname[:25]:25s} | "

@@ -31,12 +31,14 @@ class JetRacerController:
     """
     Lớp điều khiển xe JetRacer mở rộng với các hàm chức năng cơ bản.
     """
-    def __init__(self, steering_gain=-0.65, steering_offset=0.0, throttle_gain=0.8, max_throttle=10):
+    def __init__(self, steering_gain=-0.65, steering_offset=0.0,
+                 throttle_gain=0.8, max_throttle=0.5, verbose=False):
         self.car = NvidiaRacecar()
         self.car.steering_gain = steering_gain
         self.car.steering_offset = steering_offset
         self.car.throttle_gain = throttle_gain
         self.max_throttle = max_throttle
+        self.verbose = bool(verbose)
         
         # Đảm bảo khởi tạo an toàn
         self.stop()
@@ -48,7 +50,8 @@ class JetRacerController:
         """
         clamped_val = max(-1.0, min(1.0, float(value)))
         self.car.steering = clamped_val
-        print(f"[JetRacer] Góc lái (steering): {clamped_val:.2f}")
+        if self.verbose:
+            print(f"[JetRacer] Góc lái (steering): {clamped_val:.2f}")
 
     def steer_left(self, amount: float = 0.5):
         """
@@ -79,7 +82,8 @@ class JetRacerController:
         """
         clamped_val = max(-self.max_throttle, min(self.max_throttle, float(value)))
         self.car.throttle = clamped_val
-        print(f"[JetRacer] Mức ga (throttle): {clamped_val:.2f}")
+        if self.verbose:
+            print(f"[JetRacer] Mức ga (throttle): {clamped_val:.2f}")
 
     def move_forward(self, speed: float = 0.2, duration: float = None):
         """

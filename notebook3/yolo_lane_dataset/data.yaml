@@ -1,5 +1,0 @@
-path: /home/jetson/jetracer_official/notebook3/yolo_lane_dataset
-train: images/train
-val: images/val
-names:
-  0: apex
