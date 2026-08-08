@@ -13,6 +13,19 @@ lane loop không bao giờ đợi YOLO. Runtime mặc định dry-run, chỉ `--
 
 Kết quả train/inference thực tế hiện tại được ghi tại [EVALUATION.md](EVALUATION.md).
 
+Notebook chạy camera/UI thời gian thực trên Jetson:
+
+```text
+waypoint_lane_fusion/lane_fusion_live.ipynb
+```
+
+Notebook tự chọn TensorRT engine nếu engine đã được build, fallback về ONNX, và mặc
+định disarm motor. Video kiểm thử tổng hợp có thể tái tạo bằng:
+
+```bash
+python3 waypoint_lane_fusion/make_combined_inference.py
+```
+
 ## Những phần đã triển khai
 
 - collector và GUI click nhãn normalized `x,y`;

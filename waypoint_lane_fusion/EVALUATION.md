@@ -43,12 +43,12 @@ không hoàn toàn độc lập, con số này chỉ dùng để kiểm tra sani
 
 Artifacts:
 
-- `artifacts/lane_resnet18_bootstrap.pt`
 - `artifacts/lane_resnet18_bootstrap.onnx`
 - `artifacts/lane_resnet18_bootstrap.metrics.json`
-- `artifacts/demo/waypoint_inference_bootstrap_102f.mp4`
-- `artifacts/demo/waypoint_inference_bootstrap_102f_summary.json`
-- `artifacts/demo/waypoint_inference_bootstrap_pseudo_comparison.json`
+- `artifacts/combined/combined_source_5fps.mp4`
+- `artifacts/combined/combined_resnet18_inference_5fps.mp4`
+- `artifacts/combined/combined_resnet18_metrics.csv`
+- `artifacts/combined/combined_resnet18_summary.json`
 
 ## Kết luận
 

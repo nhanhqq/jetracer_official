@@ -5,6 +5,8 @@ core.*
 # Python caches
 __pycache__/
 *.py[cod]
+.ipynb_checkpoints/
+.DS_Store
 
 # Generated waypoint training/runtime data (regenerate with project scripts)
 waypoint_lane_fusion/dataset/

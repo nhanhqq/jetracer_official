@@ -70,6 +70,10 @@ class TensorRTWaypointModel:
             raise RuntimeError("Expected one input and one output binding")
 
     def predict(self, frame):
+        # Camera observers may invoke this method from a different thread than
+        # the notebook cell which constructed the engine. CUDA contexts are
+        # thread-local, so make the retained primary context current here.
+        self.cuda.make_current()
         tensor = _preprocess(frame, self.size).astype(self.host[self.input_index].dtype, copy=False)
         np.copyto(self.host[self.input_index], tensor.reshape(-1))
         self.cuda.copy_host_to_device(self.device[self.input_index], self.host[self.input_index])
@@ -121,6 +125,9 @@ class _CudaDriver:
         self._check(self.lib.cuMemAlloc_v2(ctypes.byref(pointer), byte_count), "cuMemAlloc")
         self.allocations.append(pointer)
         return pointer
+
+    def make_current(self):
+        self._check(self.lib.cuCtxSetCurrent(self.context), "cuCtxSetCurrent")
 
     def copy_host_to_device(self, device, host):
         self._check(self.lib.cuMemcpyHtoD_v2(device, ctypes.c_void_p(host.ctypes.data), host.nbytes),

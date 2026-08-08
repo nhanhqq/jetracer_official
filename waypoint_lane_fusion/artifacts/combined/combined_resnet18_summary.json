@@ -1,0 +1,16 @@
+{
+  "inputs": {
+    "1786085420908_202326730929621029_7442541399315262114.mp4": 83,
+    "1786085420913_202326730929621029_7442541399315262114.mp4": 17
+  },
+  "sample_interval_s": 0.2,
+  "output_fps": 5.0,
+  "frames": 100,
+  "duration_s": 20.0,
+  "median_inference_ms": 20.535649004159495,
+  "median_inference_fps": 48.69580697437174,
+  "source_video": "waypoint_lane_fusion/artifacts/combined/combined_source_5fps.mp4",
+  "inference_video": "waypoint_lane_fusion/artifacts/combined/combined_resnet18_inference_5fps.mp4",
+  "metrics_csv": "waypoint_lane_fusion/artifacts/combined/combined_resnet18_metrics.csv",
+  "motor_output": false
+}
