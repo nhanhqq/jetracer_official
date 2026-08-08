@@ -6,8 +6,6 @@ Red/orange lane markings become divider instances. Real obstacle boxes and addit
 synthetic obstacles are composited only inside the road region. Validation is
 split by source, not adjacent frames, to avoid temporal leakage.
 """
-from __future__ import annotations
-
 import argparse
 import random
 import shutil

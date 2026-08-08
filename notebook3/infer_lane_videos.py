@@ -14,6 +14,25 @@ import numpy as np
 from lane_detection_v2 import LaneDetector
 
 
+def adaptive_throttle(lane_confident, steering, obstacle, previous):
+    """Offline-only longitudinal controller mirroring the safe car policy.
+
+    It starts at zero until a lane is locked, slows down for large steering
+    commands and obstacles, and ramps down faster than it ramps up.  The
+    returned value is only written into the review video/CSV: this script has
+    no JetRacer motor import and cannot arm the vehicle.
+    """
+    if not lane_confident:
+        return max(0.0, previous - 0.035), "stop:lane_lost"
+    if obstacle:
+        target, state = 0.09, "slow:obstacle"
+    else:
+        target = max(0.09, min(0.18, 0.18 * (1.0 - 0.62 * abs(steering))))
+        state = "follow"
+    step = 0.008 if target > previous else 0.035
+    return float(previous + np.clip(target - previous, -step, step)), state
+
+
 def infer_video(input_path, output_dir):
     capture = cv2.VideoCapture(input_path)
     if not capture.isOpened():
@@ -35,6 +54,7 @@ def infer_video(input_path, output_dir):
     detector = LaneDetector(224, 224)
     rows = []
     previous_target = None
+    throttle = 0.0
     started = time.perf_counter()
     try:
         frame_index = 0
@@ -53,11 +73,16 @@ def infer_video(input_path, output_dir):
 
             lane_confident = bool(info["lane_confident"])
             obstacle = info["obstacle"] is not None
+            throttle, control_state = adaptive_throttle(lane_confident, steering,
+                                                         obstacle, throttle)
             decision = info["lane_action"] if lane_confident else "stop:lane_lost"
             cv2.putText(frame, "frame=%d" % frame_index, (4, 15),
                         cv2.FONT_HERSHEY_SIMPLEX, 0.38, (255, 255, 255), 1, cv2.LINE_AA)
             cv2.putText(frame, decision[:27], (4, 31), cv2.FONT_HERSHEY_SIMPLEX,
                         0.34, (0, 255, 255), 1, cv2.LINE_AA)
+            cv2.putText(frame, "steer=%+.2f  gas=%.3f  %s" %
+                        (steering, throttle, control_state), (4, 47),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.34, (0, 255, 0), 1, cv2.LINE_AA)
             writer.write(np.hstack((frame, debug)))
             rows.append({
                 "frame": frame_index,
@@ -65,6 +90,8 @@ def infer_video(input_path, output_dir):
                 "target_x": target,
                 "target_jump_px": jump,
                 "steering": "%.5f" % steering,
+                "throttle_preview": "%.5f" % throttle,
+                "control_state": control_state,
                 "lane_confident": int(lane_confident),
                 "obstacle": int(obstacle),
                 "decision": decision,
@@ -91,10 +118,13 @@ def infer_video(input_path, output_dir):
         "left_turn_frame_ratio": round(float(np.mean(steering < -0.15)), 4),
         "right_turn_frame_ratio": round(float(np.mean(steering > 0.15)), 4),
         "mean_abs_steering": round(float(np.mean(np.abs(steering))), 4),
+        "mean_throttle_preview": round(float(np.mean(
+            [float(row["throttle_preview"]) for row in rows])), 4),
         "target_jumps_over_45px": int(np.sum(jumps > 45)),
         "mean_latency_ms": round(float(np.mean(latency)), 3),
         "offline_pipeline_fps": round(len(rows) / max(elapsed, 1e-6), 2),
         "uses_manual_labels": False,
+        "motor_output": False,
     }
     with open(csv_path, "w", newline="", encoding="utf-8") as stream:
         csv_writer = csv.DictWriter(stream, fieldnames=rows[0].keys())

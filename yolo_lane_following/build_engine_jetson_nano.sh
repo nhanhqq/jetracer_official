@@ -10,7 +10,10 @@ test -f "${ONNX_PATH}" || { echo "Missing ONNX: ${ONNX_PATH}" >&2; exit 1; }
 test -x "${TRTEXEC}" || { echo "Missing trtexec: ${TRTEXEC}" >&2; exit 1; }
 
 echo "Jetson release: $(head -n 1 /etc/nv_tegra_release 2>/dev/null || echo unknown)"
-"${TRTEXEC}" --version
+# TensorRT on JetPack 4.x does not support `trtexec --version`; it treats
+# that invocation as a model-less build and returns an error. `--help` is
+# available on both the JetPack 4.x and newer releases.
+"${TRTEXEC}" --help >/dev/null
 "${TRTEXEC}" \
   --onnx="${ONNX_PATH}" \
   --saveEngine="${ENGINE_PATH}" \

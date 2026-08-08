@@ -1,7 +1,5 @@
 #!/usr/bin/env python3
 """Build a deterministic MP4 preview from a directory of dataset images."""
-from __future__ import annotations
-
 import argparse
 import re
 from pathlib import Path
