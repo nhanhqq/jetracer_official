@@ -57,6 +57,34 @@ Chỉ arm sau khi kê bánh, xác nhận chiều steering và fail-safe:
 python -m waypoint_lane_fusion.run --source camera --yolo --arm
 ```
 
+## Jetson Nano: build TensorRT và chạy thử
+
+Engine phải được build trên chính Jetson đích, không copy `.engine` từ RTX/x86:
+
+```bash
+chmod +x waypoint_lane_fusion/build_engine_jetson.sh
+./waypoint_lane_fusion/build_engine_jetson.sh
+```
+
+Kiểm tra engine bằng video trước, motor luôn tắt nếu không có `--arm`:
+
+```bash
+python3 -m waypoint_lane_fusion.run \
+  --lane-backend tensorrt \
+  --lane-model waypoint_lane_fusion/artifacts/lane_resnet18_bootstrap_fp16.engine \
+  --source notebook3/test/1786085420913_202326730929621029_7442541399315262114.mp4 \
+  --output-video waypoint_lane_fusion/artifacts/demo/nano_tensorrt_test.mp4
+```
+
+Sau đó dry-run camera:
+
+```bash
+python3 -m waypoint_lane_fusion.run \
+  --lane-backend tensorrt \
+  --lane-model waypoint_lane_fusion/artifacts/lane_resnet18_bootstrap_fp16.engine \
+  --source camera --display
+```
+
 ## Đánh giá khả thi
 
 Kiến trúc phù hợp Jetson Nano hơn YOLO26 lane segmentation: lane ResNet18 có pipeline

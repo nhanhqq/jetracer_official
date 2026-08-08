@@ -4,3 +4,4 @@ PyYAML
 onnxruntime-gpu
 # Training workstation only: torch torchvision Pillow
 # YOLOv5n worker: torch pandas; clone/cache ultralytics/yolov5 once before offline use.
+# TensorRT Jetson runtime additionally uses NVIDIA's system tensorrt + pycuda packages.

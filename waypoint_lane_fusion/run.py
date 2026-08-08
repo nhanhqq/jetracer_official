@@ -9,7 +9,7 @@ from waypoint_lane_fusion.behavior import BehaviorStateMachine
 from waypoint_lane_fusion.camera import FrameSource
 from waypoint_lane_fusion.config import load_config, resolve_path
 from waypoint_lane_fusion.controller import DriveController, WaypointFilter
-from waypoint_lane_fusion.lane_model import OnnxWaypointModel, TorchWaypointModel
+from waypoint_lane_fusion.lane_model import OnnxWaypointModel, TensorRTWaypointModel, TorchWaypointModel
 from waypoint_lane_fusion.telemetry import Telemetry, overlay
 from waypoint_lane_fusion.types import DetectionSnapshot
 from waypoint_lane_fusion.yolo_v5 import AsyncYoloV5
@@ -31,12 +31,14 @@ class CarOutput:
 def main():
     p=argparse.ArgumentParser(description="Waypoint lane + asynchronous YOLOv5n for JetRacer")
     p.add_argument("--config"); p.add_argument("--source",default="camera"); p.add_argument("--lane-model")
+    p.add_argument("--lane-backend",choices=("onnx","tensorrt","torchscript"))
     p.add_argument("--arm",action="store_true",help="actually enable motor; default dry-run")
     p.add_argument("--yolo",action="store_true",help="enable asynchronous YOLOv5n")
     p.add_argument("--display",action="store_true"); p.add_argument("--output-video")
     args=p.parse_args(); cfg=load_config(args.config); c=cfg["control"]
     model_path=Path(args.lane_model) if args.lane_model else resolve_path(cfg,cfg["models"]["lane"])
-    lane = TorchWaypointModel(model_path) if cfg["models"]["lane_backend"]=="torchscript" else OnnxWaypointModel(model_path)
+    backend=args.lane_backend or cfg["models"]["lane_backend"]
+    lane = {"onnx":OnnxWaypointModel,"tensorrt":TensorRTWaypointModel,"torchscript":TorchWaypointModel}[backend](model_path)
     source=FrameSource(args.source,cfg["camera"]); filt=WaypointFilter(c["waypoint_ema"])
     behavior=BehaviorStateMachine(c); controller=DriveController(c); car=CarOutput(cfg,args.arm)
     yolo=None
