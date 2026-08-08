@@ -1,0 +1,41 @@
+camera:
+  width: 224
+  height: 224
+  capture_fps: 30
+models:
+  lane: artifacts/lane_resnet18_bootstrap.onnx
+  lane_backend: onnx
+  yolo: yolov5n.pt
+  yolo_enabled: false
+  yolo_size: 320
+  yolo_confidence: 0.40
+  yolo_interval: 2
+control:
+  waypoint_ema: 0.30
+  # Calibrated on the current 92-image legacy baseline. Re-calibrate after
+  # collecting the recommended 3k-6k images.
+  confidence_stop: 0.45
+  confidence_resume: 0.50
+  lane_lost_frames: 3
+  lane_resume_frames: 3
+  kp: 0.95
+  kd: 0.08
+  heading_gain: 0.28
+  steering_alpha: 0.25
+  max_steering: 0.82
+  max_steering_change: 0.04
+  throttle_min: 0.07
+  throttle_max: 0.18
+  curve_penalty: 0.10
+  confidence_penalty: 0.06
+  accel_rate: 0.008
+  brake_rate: 0.035
+  turn_bias: 0.10
+  detection_ttl: 0.75
+hardware:
+  steering_gain: -0.65
+  steering_offset: 0.0
+  throttle_gain: 0.8
+runtime:
+  log_dir: logs
+  log_every: 10

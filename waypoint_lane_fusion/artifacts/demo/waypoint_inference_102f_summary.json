@@ -1,0 +1,21 @@
+{
+  "log": "/home/namphuongtran9196/jetracer_official/waypoint_lane_fusion/logs/run_20260808_051348.csv",
+  "frames": 102,
+  "median_pipeline_fps": 23.86,
+  "min_pipeline_fps": 12.87,
+  "mean_confidence": 0.5174,
+  "waypoint_x_range": [
+    0.7229,
+    0.852
+  ],
+  "waypoint_y_range": [
+    0.5685,
+    0.6044
+  ],
+  "mean_abs_steering": 0.5995,
+  "mean_throttle": 0.0795,
+  "states": {
+    "LANE_LOST": 2,
+    "NORMAL": 100
+  }
+}

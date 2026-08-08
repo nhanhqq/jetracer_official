@@ -1,0 +1,23 @@
+{
+  "model": "lane_resnet18_bootstrap.onnx",
+  "evaluation_video": "1786085420913...mp4 (held out)",
+  "frames": 102,
+  "median_pipeline_fps_cpu_onnx": 21.48,
+  "min_pipeline_fps_cpu_onnx": 13.28,
+  "mean_confidence": 0.7756,
+  "waypoint_x_range": [
+    0.4886,
+    0.6154
+  ],
+  "waypoint_y_range": [
+    0.5972,
+    0.608
+  ],
+  "mean_abs_steering": 0.1004,
+  "mean_throttle": 0.1385,
+  "states": {
+    "LANE_LOST": 2,
+    "NORMAL": 100
+  },
+  "telemetry_log": "/home/namphuongtran9196/jetracer_official/waypoint_lane_fusion/logs/run_20260808_051813.csv"
+}
