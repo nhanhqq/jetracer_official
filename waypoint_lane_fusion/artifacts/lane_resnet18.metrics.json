@@ -1,0 +1,128 @@
+{
+  "samples": 92,
+  "train_samples": 79,
+  "val_samples": 13,
+  "best_val_normalized_l2": 0.05673773928831976,
+  "history": [
+    {
+      "epoch": 1,
+      "val_normalized_l2": 0.289927302644803
+    },
+    {
+      "epoch": 2,
+      "val_normalized_l2": 0.12543641403317451
+    },
+    {
+      "epoch": 3,
+      "val_normalized_l2": 0.13900064619687888
+    },
+    {
+      "epoch": 4,
+      "val_normalized_l2": 0.2090318202972412
+    },
+    {
+      "epoch": 5,
+      "val_normalized_l2": 0.2030604974581645
+    },
+    {
+      "epoch": 6,
+      "val_normalized_l2": 0.12184293424853912
+    },
+    {
+      "epoch": 7,
+      "val_normalized_l2": 0.18514167746672264
+    },
+    {
+      "epoch": 8,
+      "val_normalized_l2": 0.13988771547491735
+    },
+    {
+      "epoch": 9,
+      "val_normalized_l2": 0.08897719145394288
+    },
+    {
+      "epoch": 10,
+      "val_normalized_l2": 0.07807863188477662
+    },
+    {
+      "epoch": 11,
+      "val_normalized_l2": 0.0751471297385601
+    },
+    {
+      "epoch": 12,
+      "val_normalized_l2": 0.0866032919774835
+    },
+    {
+      "epoch": 13,
+      "val_normalized_l2": 0.09893688101034898
+    },
+    {
+      "epoch": 14,
+      "val_normalized_l2": 0.09694201785784501
+    },
+    {
+      "epoch": 15,
+      "val_normalized_l2": 0.07126797148241447
+    },
+    {
+      "epoch": 16,
+      "val_normalized_l2": 0.05673773928831976
+    },
+    {
+      "epoch": 17,
+      "val_normalized_l2": 0.06494359385508758
+    },
+    {
+      "epoch": 18,
+      "val_normalized_l2": 0.05917892053436775
+    },
+    {
+      "epoch": 19,
+      "val_normalized_l2": 0.06678423521896967
+    },
+    {
+      "epoch": 20,
+      "val_normalized_l2": 0.06570433445561391
+    },
+    {
+      "epoch": 21,
+      "val_normalized_l2": 0.058584863964754805
+    },
+    {
+      "epoch": 22,
+      "val_normalized_l2": 0.061535087772286855
+    },
+    {
+      "epoch": 23,
+      "val_normalized_l2": 0.06578459275456575
+    },
+    {
+      "epoch": 24,
+      "val_normalized_l2": 0.07725878260456599
+    },
+    {
+      "epoch": 25,
+      "val_normalized_l2": 0.07597396006950966
+    },
+    {
+      "epoch": 26,
+      "val_normalized_l2": 0.0742482362458339
+    },
+    {
+      "epoch": 27,
+      "val_normalized_l2": 0.08105893275485589
+    },
+    {
+      "epoch": 28,
+      "val_normalized_l2": 0.07883056324835007
+    },
+    {
+      "epoch": 29,
+      "val_normalized_l2": 0.07332395790861203
+    },
+    {
+      "epoch": 30,
+      "val_normalized_l2": 0.06010178419259878
+    }
+  ]
+}

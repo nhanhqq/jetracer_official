@@ -1,0 +1,8 @@
+{
+  "pseudo_reference_note": "CV baseline is not ground truth",
+  "all_pseudo_mae": 0.12927269630906293,
+  "all_correlation": 0.7619581211899145,
+  "confident_frames": 65,
+  "confident_pseudo_mae": 0.10957908839969843,
+  "confident_correlation": 0.7061097836786563
+}

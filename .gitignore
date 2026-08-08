@@ -1,0 +1,13 @@
+# Crash dumps
+core
+core.*
+
+# Python caches
+__pycache__/
+*.py[cod]
+
+# Generated waypoint training/runtime data (regenerate with project scripts)
+waypoint_lane_fusion/dataset/
+waypoint_lane_fusion/logs/
+waypoint_lane_fusion/artifacts/*.pt
+waypoint_lane_fusion/artifacts/lane_resnet18.onnx
