@@ -1,5 +1,6 @@
 """Lane waypoint inference. Output is normalized (x, y, confidence)."""
 from pathlib import Path
+import ctypes
 import cv2
 import numpy as np
 from .types import Waypoint
@@ -37,19 +38,21 @@ class OnnxWaypointModel:
 
 
 class TensorRTWaypointModel:
-    """Static-batch TensorRT 8.x runner for JetPack 4/5 Jetsons."""
+    """Static-batch TensorRT 8.x runner using JetPack's CUDA Driver API.
+
+    This deliberately avoids PyCUDA: old JetPack 4.x images often have no
+    compatible python3-pycuda binary and compiling it on Nano is expensive.
+    """
     def __init__(self, model_path, input_size=224):
         import tensorrt as trt
-        import pycuda.autoinit  # noqa: F401 - creates the CUDA context
-        import pycuda.driver as cuda
-        self.trt, self.cuda, self.size = trt, cuda, int(input_size)
+        self.trt, self.size = trt, int(input_size)
+        self.cuda = _CudaDriver()
         logger = trt.Logger(trt.Logger.WARNING)
         with Path(model_path).open("rb") as stream:
             self.engine = trt.Runtime(logger).deserialize_cuda_engine(stream.read())
         if self.engine is None:
             raise RuntimeError("Cannot deserialize TensorRT engine: %s" % model_path)
         self.context = self.engine.create_execution_context()
-        self.stream = cuda.Stream()
         self.bindings, self.host, self.device = [], {}, {}
         self.input_index = self.output_index = None
         for index in range(self.engine.num_bindings):
@@ -57,10 +60,10 @@ class TensorRTWaypointModel:
             if any(dim < 0 for dim in shape):
                 raise RuntimeError("Dynamic TensorRT bindings are not supported: %s" % (shape,))
             dtype = trt.nptype(self.engine.get_binding_dtype(index))
-            host = cuda.pagelocked_empty(int(trt.volume(shape)), dtype)
-            device = cuda.mem_alloc(host.nbytes)
+            host = np.empty(int(trt.volume(shape)), dtype=dtype)
+            device = self.cuda.allocate(host.nbytes)
             self.host[index], self.device[index] = host, device
-            self.bindings.append(int(device))
+            self.bindings.append(device.value)
             if self.engine.binding_is_input(index): self.input_index = index
             else: self.output_index = index
         if self.input_index is None or self.output_index is None:
@@ -69,12 +72,72 @@ class TensorRTWaypointModel:
     def predict(self, frame):
         tensor = _preprocess(frame, self.size).astype(self.host[self.input_index].dtype, copy=False)
         np.copyto(self.host[self.input_index], tensor.reshape(-1))
-        self.cuda.memcpy_htod_async(self.device[self.input_index], self.host[self.input_index], self.stream)
-        if not self.context.execute_async_v2(self.bindings, self.stream.handle):
+        self.cuda.copy_host_to_device(self.device[self.input_index], self.host[self.input_index])
+        if not self.context.execute_v2(self.bindings):
             raise RuntimeError("TensorRT execution failed")
-        self.cuda.memcpy_dtoh_async(self.host[self.output_index], self.device[self.output_index], self.stream)
-        self.stream.synchronize()
+        self.cuda.copy_device_to_host(self.host[self.output_index], self.device[self.output_index])
         return _waypoint(self.host[self.output_index])
+
+    def __del__(self):
+        cuda = getattr(self, "cuda", None)
+        if cuda is not None:
+            self.context = None
+            self.engine = None
+            cuda.close()
+
+
+class _CudaDriver:
+    """Minimal synchronous CUDA Driver API needed by the TensorRT runner."""
+    def __init__(self):
+        self.lib = ctypes.CDLL("libcuda.so")
+        self.device = ctypes.c_int()
+        self.context = ctypes.c_void_p()
+        self.allocations = []
+        self._configure_signatures()
+        self._check(self.lib.cuInit(0), "cuInit")
+        self._check(self.lib.cuDeviceGet(ctypes.byref(self.device), 0), "cuDeviceGet")
+        self._check(self.lib.cuDevicePrimaryCtxRetain(ctypes.byref(self.context), self.device),
+                    "cuDevicePrimaryCtxRetain")
+        self._check(self.lib.cuCtxSetCurrent(self.context), "cuCtxSetCurrent")
+
+    def _configure_signatures(self):
+        self.lib.cuInit.argtypes = [ctypes.c_uint]
+        self.lib.cuDeviceGet.argtypes = [ctypes.POINTER(ctypes.c_int), ctypes.c_int]
+        self.lib.cuDevicePrimaryCtxRetain.argtypes = [ctypes.POINTER(ctypes.c_void_p), ctypes.c_int]
+        self.lib.cuDevicePrimaryCtxRelease.argtypes = [ctypes.c_int]
+        self.lib.cuCtxSetCurrent.argtypes = [ctypes.c_void_p]
+        self.lib.cuMemAlloc_v2.argtypes = [ctypes.POINTER(ctypes.c_uint64), ctypes.c_size_t]
+        self.lib.cuMemFree_v2.argtypes = [ctypes.c_uint64]
+        self.lib.cuMemcpyHtoD_v2.argtypes = [ctypes.c_uint64, ctypes.c_void_p, ctypes.c_size_t]
+        self.lib.cuMemcpyDtoH_v2.argtypes = [ctypes.c_void_p, ctypes.c_uint64, ctypes.c_size_t]
+
+    @staticmethod
+    def _check(result, operation):
+        if result != 0:
+            raise RuntimeError("CUDA driver %s failed with code %d" % (operation, result))
+
+    def allocate(self, byte_count):
+        pointer = ctypes.c_uint64()
+        self._check(self.lib.cuMemAlloc_v2(ctypes.byref(pointer), byte_count), "cuMemAlloc")
+        self.allocations.append(pointer)
+        return pointer
+
+    def copy_host_to_device(self, device, host):
+        self._check(self.lib.cuMemcpyHtoD_v2(device, ctypes.c_void_p(host.ctypes.data), host.nbytes),
+                    "cuMemcpyHtoD")
+
+    def copy_device_to_host(self, host, device):
+        self._check(self.lib.cuMemcpyDtoH_v2(ctypes.c_void_p(host.ctypes.data), device, host.nbytes),
+                    "cuMemcpyDtoH")
+
+    def close(self):
+        if self.lib is None:
+            return
+        for pointer in self.allocations:
+            self.lib.cuMemFree_v2(pointer)
+        self.allocations = []
+        self.lib.cuDevicePrimaryCtxRelease(self.device)
+        self.lib = None
 
 
 class TorchWaypointModel:

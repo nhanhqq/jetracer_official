@@ -66,6 +66,8 @@ chmod +x waypoint_lane_fusion/build_engine_jetson.sh
 ./waypoint_lane_fusion/build_engine_jetson.sh
 ```
 
+Backend dùng trực tiếp CUDA Driver API có sẵn trong JetPack; không cần cài PyCUDA.
+
 Kiểm tra engine bằng video trước, motor luôn tắt nếu không có `--arm`:
 
 ```bash
