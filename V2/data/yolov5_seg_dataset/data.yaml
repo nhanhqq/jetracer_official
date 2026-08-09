@@ -1,0 +1,7 @@
+path: /home/jetson/jetracer_official/V2/data/yolov5_seg_dataset
+train: images/train
+val: images/val
+names:
+  0: road
+  1: divider
+  2: obstacle
