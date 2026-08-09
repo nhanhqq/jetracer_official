@@ -1,0 +1,51 @@
+camera:
+  width: 224
+  height: 224
+  capture_fps: 30
+models:
+  waypoint: ../waypoint_lane_fusion/artifacts/lane_resnet18_bootstrap.onnx
+  waypoint_engine: models/waypoint_baseline_fp16_rebuilt.engine
+  segmentation_onnx: models/yolov5n-seg-road.onnx
+  segmentation_engine: models/yolov5n-seg-road_fp16.engine
+  segmentation_classes: [road, divider, obstacle]
+  # Nano checkpoint is intentionally conservative; geometry and white safety
+  # filtering reject low-quality blobs downstream.
+  segmentation_confidence: 0.05
+  segmentation_max_detections: 8
+  input_size: 224
+  backend: yolov5_tensorrt
+geometry:
+  roi_top: 0.38
+  bands: [0.52, 0.64, 0.76, 0.90]
+  min_road_pixels: 180
+  min_boundary_pixels: 8
+  width_shrink_tolerance: 0.20
+  max_center_jump: 0.22
+control:
+  max_steering: 0.82
+  max_steering_step: 0.075
+  steering_alpha: 0.30
+  kp: 0.82
+  kd: 0.08
+  heading_gain: 0.38
+  safety_gain: 0.48
+  obstacle_gain: 0.32
+  throttle_min: 0.0
+  throttle_cruise: 0.18
+  throttle_max: 0.24
+  throttle_step_up: 0.006
+  throttle_step_down: 0.040
+  road_confidence_stop: 0.22
+  road_confidence_caution: 0.48
+  white_center_stop: 0.32
+  recovery_timeout: 4.0
+  recovery_reverse: 0.07
+  recovery_turn: 0.34
+  reacquire_frames: 5
+runtime:
+  output_root: results
+  every: 1
+hardware:
+  steering_gain: -0.65
+  steering_offset: 0.0
+  throttle_gain: 0.8
