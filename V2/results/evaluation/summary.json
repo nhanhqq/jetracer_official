@@ -1,0 +1,10 @@
+{
+  "frames": 602,
+  "videos": 3,
+  "segmentation_confidence_mean": 0.7498171938967799,
+  "road_occupancy_mean": 0.7731466692222506,
+  "waypoint_correction_frequency": 0.840531561461794,
+  "road_lost_events": 60,
+  "recovery_triggers": 34,
+  "steering_abs_mean": 0.08072602047170345
+}

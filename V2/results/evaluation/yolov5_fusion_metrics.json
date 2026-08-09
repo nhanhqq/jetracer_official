@@ -1,0 +1,20 @@
+{
+  "yolov5_fusion_long": {
+    "frames": 497,
+    "road_lost_or_stop": 87,
+    "mean_seg_conf": 0.7255770867444671,
+    "mean_occupancy": 0.9457452898096761,
+    "mean_abs_steer": 0.06453610430945665,
+    "mean_throttle": 0.01437293773389873,
+    "corrected_frames": 414
+  },
+  "yolov5_fusion_short": {
+    "frames": 102,
+    "road_lost_or_stop": 0,
+    "mean_seg_conf": 0.9398193425224874,
+    "mean_occupancy": 0.8792143994349877,
+    "mean_abs_steer": 0.08386409455353,
+    "mean_throttle": 0.05453993295666072,
+    "corrected_frames": 56
+  }
+}

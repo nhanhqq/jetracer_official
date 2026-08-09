@@ -1,0 +1,7 @@
+{
+  "frames": 30,
+  "backend": "waypoint-tensorrt-fp16+yolov5-tensorrt",
+  "mean_ms": 125.81684759684971,
+  "median_ms": 120.87321281433105,
+  "fps": 7.948061162716961
+}

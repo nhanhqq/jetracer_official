@@ -1,0 +1,20 @@
+{
+  "yolov5_fusion_short_top8": {
+    "frames": 102,
+    "stop_recovery_frames": 0,
+    "mean_seg_conf": 0.8858977738950365,
+    "mean_occupancy": 0.6611818872848284,
+    "mean_abs_steer": 0.07682989740362027,
+    "mean_throttle": 0.04260337781435511,
+    "corrected_frames": 48
+  },
+  "yolov5_fusion_long_top8": {
+    "frames": 497,
+    "stop_recovery_frames": 90,
+    "mean_seg_conf": 0.6818010708608052,
+    "mean_occupancy": 0.7939547388113787,
+    "mean_abs_steer": 0.0667985094232529,
+    "mean_throttle": 0.013260871767634562,
+    "corrected_frames": 340
+  }
+}
