@@ -12,5 +12,4 @@ __pycache__/
 waypoint_lane_fusion/dataset/
 waypoint_lane_fusion/logs/
 waypoint_lane_fusion/artifacts/*.pt
-waypoint_lane_fusion/artifacts/*.engine
 waypoint_lane_fusion/artifacts/lane_resnet18.onnx
