@@ -15,7 +15,7 @@ if str(PROJECT_ROOT) not in sys.path:
 
 from yolo_lane_following.config import load_config, resolve_path
 from yolo_lane_following.control import AdaptiveController
-from yolo_lane_following.perception import YoloPerception
+from yolo_lane_following.semantic_perception import YoloSemanticPerception
 
 
 class CarOutput:
@@ -52,11 +52,11 @@ def main() -> None:
     args = parser.parse_args()
     cfg = load_config(args.config)
     if args.model:
-        cfg["models"]["lane"] = str(args.model.resolve())
+        cfg["models"]["semantic"] = str(args.model.resolve())
     if args.device:
         cfg["models"]["device"] = args.device
     output = CarOutput(cfg, dry_run=not args.arm)
-    perception = YoloPerception(cfg)
+    perception = YoloSemanticPerception(cfg)
     controller_cfg = dict(cfg["control"], max_lost_frames=cfg["tracking"]["max_lost_frames"])
     controller = AdaptiveController(controller_cfg)
 

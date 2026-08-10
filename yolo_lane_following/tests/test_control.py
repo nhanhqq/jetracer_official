@@ -3,7 +3,7 @@ import unittest
 import numpy as np
 
 from yolo_lane_following.control import AdaptiveController
-from yolo_lane_following.geometry import LaneEstimate, estimate_lane, obstacle_risk
+from yolo_lane_following.geometry import LaneEstimate, estimate_lane, obstacle_risk, plan_semantic_lane
 
 
 CFG = dict(kp=0.9, ki=0.02, kd=0.05, heading_gain=0.3, max_steering=0.82,
@@ -11,6 +11,7 @@ CFG = dict(kp=0.9, ki=0.02, kd=0.05, heading_gain=0.3, max_steering=0.82,
            throttle_max=0.24, throttle_step_up=0.008, throttle_step_down=0.035,
            curve_slowdown=0.62, low_confidence_slowdown=0.55,
            emergency_obstacle_ratio=0.78, obstacle_slow_ratio=0.58,
+           avoidance_speed_scale=0.45,
            max_lost_frames=3)
 
 
@@ -28,6 +29,23 @@ class GeometryTests(unittest.TestCase):
     def test_only_obstacle_on_path_has_risk(self):
         self.assertGreater(obstacle_risk([[95, 120, 130, 215]], 224, 224, 112), 0.7)
         self.assertEqual(obstacle_risk([[0, 120, 20, 215]], 224, 224, 112), 0.0)
+
+    def test_semantic_planner_avoids_obstacle_without_entering_forbidden(self):
+        road = np.zeros((224, 224), np.uint8); road[90:, 24:200] = 255
+        divider = np.zeros_like(road); divider[90:, 110:114] = 255
+        forbidden = np.zeros_like(road); forbidden[90:, :24] = 255; forbidden[90:, 200:] = 255
+        obstacle = np.zeros_like(road); obstacle[120:205, 92:132] = 255
+        lane = plan_semantic_lane(divider, road, forbidden, obstacle)
+        self.assertTrue(lane.valid)
+        self.assertEqual(lane.source, "avoid")
+        self.assertTrue(lane.target_x < 88 or lane.target_x > 136)
+
+    def test_semantic_planner_stops_when_white_shoulders_leave_no_clearance(self):
+        road = np.zeros((224, 224), np.uint8); road[90:, 94:130] = 255
+        divider = np.zeros_like(road); divider[90:, 110:114] = 255
+        forbidden = np.zeros_like(road); forbidden[90:, :108] = 255; forbidden[90:, 116:] = 255
+        lane = plan_semantic_lane(divider, road, forbidden, np.zeros_like(road))
+        self.assertFalse(lane.valid)
 
 
 class ControlTests(unittest.TestCase):

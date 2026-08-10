@@ -64,9 +64,11 @@ class AdaptiveController:
         speed_scale = max(0.28, 1.0 - c["curve_slowdown"] * curve_load)
         confidence_scale = c["low_confidence_slowdown"] + (1.0 - c["low_confidence_slowdown"]) * lane.confidence
         obstacle_scale = max(0.25, 1.0 - obstacle) if obstacle >= c["obstacle_slow_ratio"] else 1.0
+        if lane.source == "avoid":
+            obstacle_scale = min(obstacle_scale, c["avoidance_speed_scale"])
         target_throttle = float(np.clip(c["throttle_cruise"] * speed_scale * confidence_scale * obstacle_scale,
                                         c["throttle_min"], c["throttle_max"]))
         throttle = self._approach(self.last_throttle, target_throttle, c["throttle_step_up"], c["throttle_step_down"])
         self.last_error, self.last_steering, self.last_throttle = error, steering, throttle
-        state = "slow:obstacle" if obstacle >= c["obstacle_slow_ratio"] else "follow"
+        state = "avoid" if lane.source == "avoid" else ("slow:obstacle" if obstacle >= c["obstacle_slow_ratio"] else "follow")
         return ControlCommand(steering, throttle, state)

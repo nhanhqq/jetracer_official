@@ -4,17 +4,17 @@ camera:
   capture_fps: 60
 
 models:
-  # A single YOLO26-seg model returns masks and their detection boxes.
-  lane: artifacts/lane_yolo26n_seg_nano_fp16.engine
-  lane_pt_fallback: artifacts/lane_yolo26n_seg_best.pt
+  semantic: artifacts/track_yolo26n_sem_best.pt
   imgsz: 224
   confidence: 0.35
   device: "0"
 
-classes:
-  road: [road, drivable_area]
-  divider: [divider, center_line, lane_divider]
-  obstacle: [obstacle]
+semantic_classes:
+  background: 0
+  road: 1
+  divider: 2
+  forbidden: 3
+  obstacle: 4
 
 tracking:
   target_mode: divider       # keep camera centre on the physical divider
@@ -24,6 +24,7 @@ tracking:
   min_mask_pixels: 35
   confidence_ema: 0.35
   max_lost_frames: 3
+  vehicle_half_width: 13
 
 control:
   steering_gain: -0.65       # hardware calibration, inherited from notebook3
@@ -44,6 +45,7 @@ control:
   low_confidence_slowdown: 0.55
   emergency_obstacle_ratio: 0.78
   obstacle_slow_ratio: 0.58
+  avoidance_speed_scale: 0.45
 
 runtime:
   log_dir: logs

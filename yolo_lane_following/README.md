@@ -1,4 +1,31 @@
-# YOLO26 Lane Following cho JetRacer
+# YOLO26 Semantic Lane Following cho JetRacer
+
+Pipeline chính dùng `yolo26n-sem` (semantic segmentation), không dùng YOLO instance segmentation cũ. Mỗi pixel được phân loại thành `background`, `road`, `divider`, `forbidden` hoặc `obstacle`. Target mặc định là divider cam. Xe chỉ rời divider khi mask obstacle cắt corridor của xe; corridor mới phải nằm trong road và không đè lên `forbidden` (phần trắng). Khi obstacle không còn cắt corridor, target trở về divider ngay. Không đủ corridor an toàn hoặc mất divider thì dừng.
+
+## Train Semantic
+
+```bash
+python yolo_lane_following/prepare_semantic_dataset.py --clean
+python yolo_lane_following/train_semantic.py --epochs 80 --device 0
+```
+
+Dataset sinh ra tại `semantic_dataset/`: 1 PNG mask lossless cho mỗi ảnh, class ID 0..4 theo `data.yaml`. `workers=0` là mặc định để không lỗi shared-memory trên Jetson/container.
+
+## Dry Run
+
+```bash
+python yolo_lane_following/run.py \
+  --source notebook3/test/1786085420908_202326730929621029_7442541399315262114.mp4 \
+  --output-video yolo_lane_following/artifacts/semantic_test.mp4
+```
+
+Không có `--arm` nghĩa là không ghi ga/lái ra phần cứng. Chỉ dùng `--arm` sau khi đã kiểm tra overlay, CSV telemetry và thử xe trên giá kê bánh.
+
+Hướng dẫn cài đặt và build TensorRT trên Jetson Nano nằm tại [JETSON_NANO_SETUP.md](JETSON_NANO_SETUP.md). Notebook live tương ứng là [semantic_lane_live.ipynb](semantic_lane_live.ipynb).
+
+---
+
+## Pipeline instance cũ
 
 Pipeline này kế thừa camera, calibration xe và video kiểm thử trong `notebook3`,
 nhưng thay nhận diện lane theo ngưỡng màu bằng YOLO26 segmentation.

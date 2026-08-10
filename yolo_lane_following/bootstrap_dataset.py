@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+from __future__ import annotations
 """Build a YOLO26 instance-segmentation dataset from repository road footage.
 
 The existing notebook3 lane detector supplies conservative pseudo masks for road.
