@@ -40,10 +40,10 @@ class Controller:
         elif self.state == State.NORMAL and geom.confidence < c['road_confidence_caution']: self.state=State.CAUTION
         elif self.state == State.CAUTION and geom.confidence > .62 and self.lost == 0: self.state=State.NORMAL
         if self.state == State.STOP: return Command(self._ramp(self.last_steer,0,c['max_steering_step'],c['max_steering_step']),0,self.state.value,'ROAD_LOST_OR_WHITE_CENTER')
-        if self.state == State.RECOVERY_REVERSE: return Command(0,-c['recovery_reverse'],self.state.value,'PERCEPTION_RECOVERY')
+        if self.state == State.RECOVERY_REVERSE: return Command(0,-min(c['recovery_reverse'], c['throttle_max']),self.state.value,'PERCEPTION_RECOVERY')
         if self.state == State.RECOVERY_TURN:
             # White side is directional; turn toward the visible road.
-            s = c['recovery_turn'] if geom.white_left > geom.white_right else -c['recovery_turn']
+            s = min(c['recovery_turn'], c['max_steering']) if geom.white_left > geom.white_right else -min(c['recovery_turn'], c['max_steering'])
             return Command(s,0,self.state.value,'RECOVERY_TURN_TO_ROAD')
         if self.state == State.REACQUIRE: return Command(self._ramp(self.last_steer,0,c['max_steering_step'],c['max_steering_step']),0,self.state.value,'REACQUIRE')
         error=float(target.x-.5); derivative=(error-self.last_error)/dt; self.last_error=error

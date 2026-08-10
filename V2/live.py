@@ -16,7 +16,7 @@ from .control import Controller, State
 
 class LiveRunner:
     def __init__(self, config_path=None, arm=False):
-        self.cfg=load_config(config_path); self.armed=bool(arm); self.running=False; self.camera=None; self.car=None; self.model=None; self.mode='geometry-fallback'; self.lock=threading.Lock(); self.last=time.time(); self.fps=0.; self.widgets=None
+        self.cfg=load_config(config_path); self.armed=bool(arm); self.running=False; self.live_enabled=False; self.camera=None; self.car=None; self.model=None; self.mode='geometry-fallback'; self.lock=threading.Lock(); self.last=time.time(); self.fps=0.; self.widgets=None
         self.controller=Controller(self.cfg['control'])
         self.segmenter=Segmenter(self.cfg)
         self._load_waypoint()
@@ -47,17 +47,23 @@ class LiveRunner:
         return small,road,outside,marking,geom,target,command,dt
 
     def _callback(self, change):
-        if not self.running or not self.lock.acquire(False): return
+        if not self.running or not self.live_enabled or not self.lock.acquire(False): return
         try:
             frame=change['new']; result=self._command(frame); small,road,outside,marking,geom,target,cmd,dt=result
-            if self.armed and cmd.state not in (State.STOP.value,State.REACQUIRE.value): self.car.set_steering(cmd.steering); self.car.set_throttle(cmd.throttle)
-            else: self.car.stop(); self.car.center_steering()
+            if self.armed and self.car is not None and cmd.state not in (State.STOP.value,State.REACQUIRE.value):
+                self.car.set_steering(cmd.steering); self.car.set_throttle(cmd.throttle)
+            elif self.car is not None: self.car.stop(); self.car.center_steering()
             instant=1/max(1e-3,dt); self.fps=instant if not self.fps else .2*instant+.8*self.fps
             view=small.copy(); view[road>0]=(30,110,30); view[outside>0]=(220,220,220); view[marking>0]=(0,80,220)
             view[self.segmenter.obstacle>0]=(0,0,255)
             if geom.points: cv2.polylines(view,[np.asarray([(int(x),int(y)) for y,x in geom.points],np.int32)],False,(0,255,0),2)
             cv2.circle(view,(int(target.x*224),int(target.y*224)),5,(255,0,255),-1); cv2.putText(view,'%s %.1ffps conf %.2f steer %.2f gas %.2f'%(cmd.state,self.fps,geom.confidence,cmd.steering,cmd.throttle),(2,15),cv2.FONT_HERSHEY_SIMPLEX,.35,(0,255,255),1)
-            if self.widgets: self.widgets['image'].value=bytes(cv2.imencode('.jpg',view)[1]); self.widgets['status'].value='<b>%s | %s | %.1f FPS | conf %.2f</b>'%(self.mode,cmd.state,self.fps,geom.confidence)
+            if self.widgets:
+                raw_jpeg=bytes(cv2.imencode('.jpg',small)[1])
+                debug_jpeg=bytes(cv2.imencode('.jpg',view)[1])
+                if 'image' in self.widgets: self.widgets['image'].value=raw_jpeg
+                if 'debug_view' in self.widgets: self.widgets['debug_view'].value=debug_jpeg
+                if 'status' in self.widgets: self.widgets['status'].value='<b>%s | %s | %.1f FPS | conf %.2f | steer %+.3f | throttle %+.3f</b>'%(self.mode,cmd.state,self.fps,geom.confidence,cmd.steering,cmd.throttle)
         except Exception as exc:
             self.stop();
             if self.widgets: self.widgets['status'].value='<b style="color:red">ERROR: %s</b>'%exc
@@ -66,15 +72,32 @@ class LiveRunner:
     def start(self):
         from jetcam.csi_camera import CSICamera
         from notebook3.basic_motion import JetRacerController
-        c=self.cfg['camera']; self.camera=CSICamera(width=c['width'],height=c['height'],capture_fps=0); h=self.cfg.get('hardware',{'steering_gain':-.65,'steering_offset':0.,'throttle_gain':.8})
+        if self.running: return
+        c=self.cfg['camera']; self.camera=CSICamera(width=c['width'],height=c['height'],capture_fps=c.get('capture_fps',0)); h=self.cfg.get('hardware',{'steering_gain':-.65,'steering_offset':0.,'throttle_gain':.8})
         self.car=JetRacerController(h['steering_gain'],h['steering_offset'],h['throttle_gain'],self.cfg['control']['throttle_max']); self.car.stop(); self.car.center_steering(); self.running=True; self.camera.observe(self._callback,names='value'); self.camera.running=True
+
+    def set_limits(self, max_throttle=None, max_steering=None):
+        """Change automatic command caps without replacing closed-loop control."""
+        c=self.cfg['control']
+        if max_throttle is not None:
+            c['throttle_max']=float(np.clip(max_throttle, 0.0, 1.0))
+            if self.car is not None: self.car.max_throttle=c['throttle_max']
+        if max_steering is not None:
+            c['max_steering']=float(np.clip(max_steering, 0.0, 1.0))
+            self.controller.last_steer=float(np.clip(self.controller.last_steer, -c['max_steering'], c['max_steering']))
 
     def set_armed(self, value):
         self.armed=bool(value)
         if not self.armed and self.car: self.car.stop(); self.car.center_steering()
 
+    def set_live(self, value):
+        self.live_enabled=bool(value) and self.running
+        if not self.live_enabled and self.car:
+            self.car.stop(); self.car.center_steering()
+
     def stop(self):
         self.running=False
+        self.live_enabled=False
         if self.car: self.car.stop(); self.car.center_steering()
         if self.camera:
             self.camera.unobserve_all(); self.camera.running=False
