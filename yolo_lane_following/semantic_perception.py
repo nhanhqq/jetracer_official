@@ -8,7 +8,7 @@ import cv2
 import numpy as np
 
 from .config import resolve_path
-from .geometry import LaneEstimate, obstacle_risk, plan_semantic_lane
+from .geometry import LaneEstimate, estimate_lane, obstacle_risk, plan_semantic_lane
 
 
 @dataclass
@@ -18,6 +18,9 @@ class SemanticPerceptionResult:
     obstacle_boxes: List[List[float]]
     masks: Dict[str, np.ndarray]
     annotated: np.ndarray
+    forbidden_left: float = 0.0
+    forbidden_right: float = 0.0
+    escape_steering: float = 0.0
 
 
 class YoloSemanticPerception:
@@ -59,6 +62,9 @@ class YoloSemanticPerception:
         result = self.model.predict(frame, imgsz=self.imgsz, device=self.device, verbose=False)[0]
         masks = self._masks(result, frame.shape[:2])
         t = self.cfg["tracking"]
+        divider_lane = estimate_lane(masks["divider"], masks["road"],
+                                     t["lookahead_ratio"], t["bottom_ratio"],
+                                     t["roi_top_ratio"], t["min_mask_pixels"], "divider")
         lane = plan_semantic_lane(masks["divider"], masks["road"], masks["forbidden"], masks["obstacle"],
                                   t["lookahead_ratio"], t["bottom_ratio"], t["roi_top_ratio"],
                                   t["min_mask_pixels"], t["vehicle_half_width"])
@@ -69,7 +75,20 @@ class YoloSemanticPerception:
         else:
             self.last_target_x = None
         boxes = self._boxes(masks["obstacle"])
-        risk = obstacle_risk(boxes, frame.shape[1], frame.shape[0], lane.near_x)
+        # Risk is measured against the divider corridor, not the temporary
+        # avoidance target.  Otherwise selecting an escape route hides the
+        # obstacle from the controller on the same frame.
+        risk = obstacle_risk(boxes, frame.shape[1], frame.shape[0], divider_lane.near_x)
+        roi = masks["forbidden"][int(frame.shape[0] * t["roi_top_ratio"]):]
+        mid = roi.shape[1] // 2
+        forbidden_left = float(np.count_nonzero(roi[:, :mid])) / max(1, roi[:, :mid].size)
+        forbidden_right = float(np.count_nonzero(roi[:, mid:])) / max(1, roi[:, mid:].size)
+        safe = ((masks["road"] > 0) & (masks["forbidden"] == 0) &
+                (masks["obstacle"] == 0))
+        low = safe[int(frame.shape[0] * t["lookahead_ratio"]):]
+        left_clear = int(np.count_nonzero(low[:, :mid]))
+        right_clear = int(np.count_nonzero(low[:, mid:]))
+        escape_steering = 1.0 if right_clear > left_clear else (-1.0 if left_clear > right_clear else 0.0)
         overlay = frame.copy()
         colours = {"road": (70, 160, 70), "divider": (0, 110, 255),
                    "forbidden": (255, 80, 220), "obstacle": (0, 0, 255)}
@@ -81,4 +100,5 @@ class YoloSemanticPerception:
         colour = (0, 255, 0) if lane.valid else (0, 0, 255)
         cv2.line(annotated, (frame.shape[1] // 2, frame.shape[0]),
                  (int(lane.target_x), int(frame.shape[0] * t["lookahead_ratio"])), colour, 2)
-        return SemanticPerceptionResult(lane, risk, boxes, masks, annotated)
+        return SemanticPerceptionResult(lane, risk, boxes, masks, annotated,
+                                        forbidden_left, forbidden_right, escape_steering)

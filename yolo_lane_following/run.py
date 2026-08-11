@@ -106,7 +106,9 @@ def main() -> None:
                 result = perception.infer(frame)
                 now = time.perf_counter()
                 dt, last = now - last, now
-                command = controller.update(result.lane, result.obstacle_risk, frame.shape[1], dt)
+                command = controller.update(result.lane, result.obstacle_risk, frame.shape[1], dt,
+                                            result.forbidden_left, result.forbidden_right,
+                                            result.escape_steering)
                 output.set(command.steering, command.throttle)
                 elapsed = time.perf_counter() - started
                 annotated = result.annotated

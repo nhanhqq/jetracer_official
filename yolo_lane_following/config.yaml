@@ -46,6 +46,20 @@ control:
   emergency_obstacle_ratio: 0.78
   obstacle_slow_ratio: 0.58
   avoidance_speed_scale: 0.45
+  # ESC needs a neutral command before changing from forward to reverse.
+  reverse_neutral_time: 0.12
+  reverse_time: 0.35
+  reverse_throttle: 0.11
+  recovery_steering: 0.34
+  recovery_throttle: 0.11
+  obstacle_avoid_time: 2.0
+  obstacle_avoid_throttle: 0.16
+  obstacle_avoid_steering_limit: 0.55
+  avoid_retry_time: 0.25
+  avoid_hold_time: 0.45
+  white_correct_time: 0.30
+  white_side_threshold: 0.12
+  white_side_margin: 0.04
 
 runtime:
   log_dir: logs

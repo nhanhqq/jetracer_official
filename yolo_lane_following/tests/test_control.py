@@ -12,6 +12,7 @@ CFG = dict(kp=0.9, ki=0.02, kd=0.05, heading_gain=0.3, max_steering=0.82,
            curve_slowdown=0.62, low_confidence_slowdown=0.55,
            emergency_obstacle_ratio=0.78, obstacle_slow_ratio=0.58,
            avoidance_speed_scale=0.45,
+           reverse_neutral_time=0.10, reverse_time=0.20,
            max_lost_frames=3)
 
 
@@ -56,10 +57,32 @@ class ControlTests(unittest.TestCase):
         self.assertGreater(cmd.steering, 0)
         self.assertGreater(cmd.throttle, 0)
 
-    def test_close_obstacle_stops(self):
+    def test_close_obstacle_drives_forward_then_returns_to_divider(self):
+        ctl = AdaptiveController(CFG)
+        lane = LaneEstimate(True, 160, 112, 0, 0, 1, "avoid")
+        avoid = ctl.update(lane, 0.9, 224, 0.05, escape_steering=-1.0)
+        self.assertGreater(avoid.throttle, 0)
+        self.assertEqual(avoid.state, "avoid:obstacle")
+        self.assertLess(avoid.steering, 0)
+        divider = LaneEstimate(True, 112, 112, 0, 0, 1, "divider")
+        for _ in range(45):
+            avoid = ctl.update(divider, 0.0, 224, 0.05)
+        self.assertEqual(avoid.state, "follow")
+
+    def test_white_left_reverses_and_steers_right(self):
         ctl = AdaptiveController(CFG)
         lane = LaneEstimate(True, 112, 112, 0, 0, 1, "divider")
-        self.assertEqual(ctl.update(lane, 0.9, 224, 0.05).throttle, 0)
+        cmd = ctl.update(lane, 0.0, 224, 0.05, forbidden_left=0.30, forbidden_right=0.02)
+        self.assertLess(cmd.throttle, 0)
+        self.assertGreater(cmd.steering, 0)
+        self.assertTrue(cmd.state.startswith("reverse:white"))
+
+    def test_blocked_obstacle_uses_wider_side_hint(self):
+        ctl = AdaptiveController(CFG)
+        lane = LaneEstimate(False, 112, 112, 0, 1, 0, "blocked")
+        cmd = ctl.update(lane, 0.9, 224, 0.05, escape_steering=-1.0)
+        self.assertLess(cmd.throttle, 0)
+        self.assertLess(cmd.steering, 0)
 
     def test_lane_loss_stops_after_debounce(self):
         ctl = AdaptiveController(CFG)
