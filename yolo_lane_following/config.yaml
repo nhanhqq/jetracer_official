@@ -25,6 +25,10 @@ tracking:
   confidence_ema: 0.35
   max_lost_frames: 3
   vehicle_half_width: 13
+  road_hint_min_ratio: 0.005
+  front_roi_top_ratio: 0.62
+  front_roi_left_ratio: 0.30
+  front_roi_right_ratio: 0.70
 
 control:
   steering_gain: -0.65       # hardware calibration, inherited from notebook3
@@ -35,11 +39,14 @@ control:
   kd: 0.10
   heading_gain: 0.42
   max_steering: 0.82
-  max_steering_step: 0.16
+  max_steering_step: 0.18
+  maneuver_steering_step: 0.24
   throttle_min: 0.09
-  throttle_cruise: 0.18
-  throttle_max: 0.24
-  throttle_step_up: 0.008
+  throttle_cruise: 0.23
+  throttle_max: 0.32
+  throttle_limit_min: 0.08
+  throttle_limit_max: 0.60
+  throttle_step_up: 0.012
   throttle_step_down: 0.035
   curve_slowdown: 0.62
   low_confidence_slowdown: 0.55
@@ -50,14 +57,22 @@ control:
   reverse_neutral_time: 0.12
   reverse_time: 0.35
   reverse_throttle: 0.11
-  recovery_steering: 0.34
-  recovery_throttle: 0.11
+  recovery_steering: 0.44
+  recovery_throttle: 0.12
+  lane_reacquire_steering: 0.58
+  lane_reacquire_throttle: 0.10
   obstacle_avoid_time: 2.0
-  obstacle_avoid_throttle: 0.16
-  obstacle_avoid_steering_limit: 0.55
+  obstacle_avoid_throttle: 0.18
+  obstacle_avoid_steering: 0.74
+  obstacle_preempt_steering_step: 0.72
+  obstacle_avoid_steering_limit: 0.82
   avoid_retry_time: 0.25
   avoid_hold_time: 0.45
   white_correct_time: 0.30
+  white_side_correct_time: 0.22
+  white_recovery_cooldown: 0.40
+  white_front_reverse_threshold: 0.58
+  white_front_reverse_frames: 2
   white_side_threshold: 0.12
   white_side_margin: 0.04
 

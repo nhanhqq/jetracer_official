@@ -108,7 +108,7 @@ def main() -> None:
                 dt, last = now - last, now
                 command = controller.update(result.lane, result.obstacle_risk, frame.shape[1], dt,
                                             result.forbidden_left, result.forbidden_right,
-                                            result.escape_steering)
+                                            result.escape_steering, result.forbidden_front)
                 output.set(command.steering, command.throttle)
                 elapsed = time.perf_counter() - started
                 annotated = result.annotated
@@ -150,7 +150,8 @@ def main() -> None:
                 capture.release()
             if video_writer is not None:
                 video_writer.release()
-            cv2.destroyAllWindows()
+            if args.display:
+                cv2.destroyAllWindows()
     print(f"Log: {log_path}")
     if fps_samples:
         print(f"Frames: {frame_count} | median FPS: {statistics.median(fps_samples):.1f} | "

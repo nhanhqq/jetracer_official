@@ -21,6 +21,7 @@ class SemanticPerceptionResult:
     forbidden_left: float = 0.0
     forbidden_right: float = 0.0
     escape_steering: float = 0.0
+    forbidden_front: float = 0.0
 
 
 class YoloSemanticPerception:
@@ -83,12 +84,21 @@ class YoloSemanticPerception:
         mid = roi.shape[1] // 2
         forbidden_left = float(np.count_nonzero(roi[:, :mid])) / max(1, roi[:, :mid].size)
         forbidden_right = float(np.count_nonzero(roi[:, mid:])) / max(1, roi[:, mid:].size)
+        front_y1 = int(frame.shape[0] * float(t.get("front_roi_top_ratio", 0.62)))
+        front_x1 = int(frame.shape[1] * float(t.get("front_roi_left_ratio", 0.30)))
+        front_x2 = int(frame.shape[1] * float(t.get("front_roi_right_ratio", 0.70)))
+        front = masks["forbidden"][front_y1:, front_x1:front_x2]
+        forbidden_front = float(np.count_nonzero(front)) / max(1, front.size)
         safe = ((masks["road"] > 0) & (masks["forbidden"] == 0) &
                 (masks["obstacle"] == 0))
         low = safe[int(frame.shape[0] * t["lookahead_ratio"]):]
         left_clear = int(np.count_nonzero(low[:, :mid]))
         right_clear = int(np.count_nonzero(low[:, mid:]))
-        escape_steering = 1.0 if right_clear > left_clear else (-1.0 if left_clear > right_clear else 0.0)
+        min_hint = max(1, int(low[:, :mid].size * float(t.get("road_hint_min_ratio", 0.005))))
+        if max(left_clear, right_clear) < min_hint:
+            escape_steering = 0.0
+        else:
+            escape_steering = 1.0 if right_clear > left_clear else (-1.0 if left_clear > right_clear else 0.0)
         overlay = frame.copy()
         colours = {"road": (70, 160, 70), "divider": (0, 110, 255),
                    "forbidden": (255, 80, 220), "obstacle": (0, 0, 255)}
@@ -101,4 +111,5 @@ class YoloSemanticPerception:
         cv2.line(annotated, (frame.shape[1] // 2, frame.shape[0]),
                  (int(lane.target_x), int(frame.shape[0] * t["lookahead_ratio"])), colour, 2)
         return SemanticPerceptionResult(lane, risk, boxes, masks, annotated,
-                                        forbidden_left, forbidden_right, escape_steering)
+                                        forbidden_left, forbidden_right, escape_steering,
+                                        forbidden_front)
