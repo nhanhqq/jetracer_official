@@ -24,6 +24,18 @@ class SemanticPerceptionResult:
     forbidden_front: float = 0.0
 
 
+class ConsecutiveRiskGate:
+    """Require a persistent on-path obstacle before changing the corridor."""
+
+    def __init__(self, required_frames: int):
+        self.required_frames = max(1, int(required_frames))
+        self.count = 0
+
+    def update(self, active: bool) -> bool:
+        self.count = self.count + 1 if active else 0
+        return self.count >= self.required_frames
+
+
 class YoloSemanticPerception:
     """Dense YOLO26 semantic output adapter for the track safety policy."""
 
@@ -41,6 +53,15 @@ class YoloSemanticPerception:
         self.class_ids = {str(name).lower(): int(class_id)
                           for name, class_id in cfg["semantic_classes"].items()}
         self.last_target_x = None
+        self.obstacle_gate = ConsecutiveRiskGate(
+            cfg["tracking"].get("obstacle_confirm_frames", 1))
+
+    def warmup(self) -> None:
+        """Initialize the lazy backend before camera callbacks or motor gating."""
+        height = int(self.cfg["camera"]["height"])
+        width = int(self.cfg["camera"]["width"])
+        blank = np.zeros((height, width, 3), dtype=np.uint8)
+        self.model.predict(blank, imgsz=self.imgsz, device=self.device, verbose=False)
 
     def _masks(self, result, shape: tuple[int, int]) -> Dict[str, np.ndarray]:
         height, width = shape
@@ -66,20 +87,27 @@ class YoloSemanticPerception:
         divider_lane = estimate_lane(masks["divider"], masks["road"],
                                      t["lookahead_ratio"], t["bottom_ratio"],
                                      t["roi_top_ratio"], t["min_mask_pixels"], "divider")
+        raw_obstacle = masks["obstacle"]
+        raw_boxes = self._boxes(raw_obstacle)
+        raw_risk = obstacle_risk(raw_boxes, frame.shape[1], frame.shape[0], divider_lane.near_x)
+        trigger = float(self.cfg["control"].get("obstacle_slow_ratio", 0.58))
+        obstacle_confirmed = self.obstacle_gate.update(raw_risk >= trigger)
+        if not obstacle_confirmed:
+            masks["obstacle"] = np.zeros_like(raw_obstacle)
         lane = plan_semantic_lane(masks["divider"], masks["road"], masks["forbidden"], masks["obstacle"],
                                   t["lookahead_ratio"], t["bottom_ratio"], t["roi_top_ratio"],
-                                  t["min_mask_pixels"], t["vehicle_half_width"])
+                                  t["min_mask_pixels"], t["vehicle_half_width"], divider_lane)
         if lane.valid:
             if self.last_target_x is not None:
                 lane.target_x = float(np.clip(lane.target_x, self.last_target_x - 28, self.last_target_x + 28))
             self.last_target_x = lane.target_x
         else:
             self.last_target_x = None
-        boxes = self._boxes(masks["obstacle"])
+        boxes = raw_boxes if obstacle_confirmed else []
         # Risk is measured against the divider corridor, not the temporary
         # avoidance target.  Otherwise selecting an escape route hides the
         # obstacle from the controller on the same frame.
-        risk = obstacle_risk(boxes, frame.shape[1], frame.shape[0], divider_lane.near_x)
+        risk = raw_risk if obstacle_confirmed else 0.0
         roi = masks["forbidden"][int(frame.shape[0] * t["roi_top_ratio"]):]
         mid = roi.shape[1] // 2
         forbidden_left = float(np.count_nonzero(roi[:, :mid])) / max(1, roi[:, :mid].size)

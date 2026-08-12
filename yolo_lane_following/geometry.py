@@ -19,18 +19,18 @@ class LaneEstimate:
 
 
 def _fit_x(mask: np.ndarray, top_y: int, min_pixels: int) -> Optional[np.ndarray]:
-    ys, xs = np.nonzero(mask)
-    keep = ys >= top_y
-    xs, ys = xs[keep], ys[keep]
-    if xs.size < min_pixels or np.unique(ys).size < 6:
+    roi = mask[top_y:] > 0
+    row_counts = np.count_nonzero(roi, axis=1)
+    valid_rows = row_counts > 0
+    if int(row_counts.sum()) < min_pixels or np.count_nonzero(valid_rows) < 6:
         return None
     # Equalise row influence so a thick blob at the bottom cannot dominate.
-    sampled_y, sampled_x = [], []
-    for y in np.unique(ys):
-        row = xs[ys == y]
-        sampled_y.append(y)
-        sampled_x.append(float(np.median(row)))
-    return np.polyfit(np.asarray(sampled_y), np.asarray(sampled_x), 2)
+    # A vectorised row centroid is equivalent to the median for the thin,
+    # connected divider strip and avoids hundreds of tiny NumPy median calls.
+    x_coordinates = np.arange(mask.shape[1], dtype=np.float32)
+    row_centres = np.sum(roi * x_coordinates, axis=1)[valid_rows] / row_counts[valid_rows]
+    sampled_y = np.flatnonzero(valid_rows).astype(np.float32) + float(top_y)
+    return np.polyfit(sampled_y, row_centres, 2)
 
 
 def _largest_component(mask: np.ndarray) -> np.ndarray:
@@ -54,10 +54,14 @@ def _path_component(mask: np.ndarray) -> np.ndarray:
         x, y, bw, bh, area = stats[label]
         if area < 12 or bh < 5:
             continue
-        component = labels == label
-        ys, xs = np.nonzero(component)
-        lower = ys >= np.percentile(ys, 70)
-        near_x = float(np.median(xs[lower])) if np.any(lower) else float(centroids[label, 0])
+        # Inspect only this component's lower bounding-box slice. Building a
+        # full-frame boolean mask per label made cluttered CSI scenes scale as
+        # O(number_of_components * image_pixels).
+        lower_y = y + int(bh * 0.70)
+        crop = labels[lower_y:y + bh, x:x + bw] == label
+        crop_x = np.nonzero(crop)[1]
+        near_x = (float(np.median(crop_x) + x) if crop_x.size
+                  else float(centroids[label, 0]))
         bottom = float((y + bh) / h)
         coverage = float(bh / h)
         centre_penalty = abs(near_x - w / 2.0) / w
@@ -150,6 +154,7 @@ def plan_semantic_lane(
     roi_top_ratio: float = 0.45,
     min_pixels: int = 35,
     vehicle_half_width: int = 13,
+    divider_lane: Optional[LaneEstimate] = None,
 ) -> LaneEstimate:
     """Plan inside semantic road only, never using white forbidden pixels.
 
@@ -157,8 +162,10 @@ def plan_semantic_lane(
     corridor, a road-supported side target is selected.  Once clear, the normal
     divider target is returned automatically on the following frame.
     """
-    lane = estimate_lane(divider_mask, road_mask, lookahead_ratio, bottom_ratio,
-                         roi_top_ratio, min_pixels, target_mode="divider")
+    lane = divider_lane
+    if lane is None:
+        lane = estimate_lane(divider_mask, road_mask, lookahead_ratio, bottom_ratio,
+                             roi_top_ratio, min_pixels, target_mode="divider")
     if not lane.valid:
         return lane
     h, w = road_mask.shape

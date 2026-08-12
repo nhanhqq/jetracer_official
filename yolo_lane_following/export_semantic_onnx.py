@@ -85,7 +85,8 @@ def replace_uint8_casts(model: onnx.ModelProto) -> int:
 
 def main() -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--model", type=Path, default=ROOT / "artifacts" / "track_yolo26n_sem_best.pt")
+    parser.add_argument("--model", type=Path,
+                        default=ROOT / "artifacts" / "track_yolo26n_sem_cube_best.pt")
     parser.add_argument("--imgsz", type=int, default=224)
     args = parser.parse_args()
     exported = YOLO(str(args.model), task="semantic").export(

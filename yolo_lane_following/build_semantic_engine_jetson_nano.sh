@@ -2,8 +2,8 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-ONNX_PATH="${1:-${SCRIPT_DIR}/artifacts/track_yolo26n_sem_best.onnx}"
-ENGINE_PATH="${2:-${SCRIPT_DIR}/artifacts/track_yolo26n_sem_nano_fp16.engine}"
+ONNX_PATH="${1:-${SCRIPT_DIR}/artifacts/track_yolo26n_sem_cube_best.onnx}"
+ENGINE_PATH="${2:-${SCRIPT_DIR}/artifacts/track_yolo26n_sem_cube_nano_fp16.engine}"
 TRTEXEC="${TRTEXEC:-/usr/src/tensorrt/bin/trtexec}"
 
 test -f "${ONNX_PATH}" || { echo "Missing ONNX: ${ONNX_PATH}" >&2; exit 1; }

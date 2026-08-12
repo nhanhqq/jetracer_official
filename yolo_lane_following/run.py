@@ -57,7 +57,13 @@ def main() -> None:
         cfg["models"]["device"] = args.device
     output = CarOutput(cfg, dry_run=not args.arm)
     perception = YoloSemanticPerception(cfg)
-    controller_cfg = dict(cfg["control"], max_lost_frames=cfg["tracking"]["max_lost_frames"])
+    perception.warmup()
+    controller_cfg = dict(
+        cfg["control"],
+        max_lost_frames=cfg["tracking"]["max_lost_frames"],
+        lane_lock_confirm_frames=cfg["tracking"].get("lane_lock_confirm_frames", 1),
+        lane_lock_min_confidence=cfg["tracking"].get("lane_lock_min_confidence", 0.0),
+    )
     controller = AdaptiveController(controller_cfg)
 
     camera = None
@@ -102,6 +108,13 @@ def main() -> None:
                     ok, frame = capture.read()
                 if not ok:
                     break
+                # Match the live CSI path: semantic inference, geometry and
+                # control all operate on the configured 224x224 frame. Feeding
+                # a 1280x720 replay here made postprocessing needlessly resize
+                # full-resolution masks and hid the actual Nano throughput.
+                inference_size = (int(cfg["camera"]["width"]), int(cfg["camera"]["height"]))
+                if (frame.shape[1], frame.shape[0]) != inference_size:
+                    frame = cv2.resize(frame, inference_size, interpolation=cv2.INTER_AREA)
                 started = time.perf_counter()
                 result = perception.infer(frame)
                 now = time.perf_counter()

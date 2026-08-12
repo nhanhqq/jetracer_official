@@ -1,6 +1,6 @@
 # YOLO26 Semantic Lane Following cho JetRacer
 
-Pipeline chính dùng `yolo26n-sem` (semantic segmentation), không dùng YOLO instance segmentation cũ. Mỗi pixel được phân loại thành `background`, `road`, `divider`, `forbidden` hoặc `obstacle`. Target mặc định là divider cam. Xe chỉ rời divider khi mask obstacle cắt corridor của xe; corridor mới phải nằm trong road và không đè lên `forbidden` (phần trắng). Khi obstacle không còn cắt corridor, target trở về divider ngay. Không đủ corridor an toàn hoặc mất divider thì dừng.
+Pipeline chính dùng `yolo26n-sem` (semantic segmentation), không dùng YOLO instance segmentation cũ. Mỗi pixel được phân loại thành `background`, `road`, `divider`, `forbidden` hoặc `obstacle`. Target mặc định là divider cam. Xe chỉ rời divider khi mask obstacle cắt corridor của xe; corridor mới phải nằm trong road và không đè lên `forbidden` (phần trắng). Khi obstacle không còn cắt corridor, target trở về divider ngay. Nếu obstacle che kín corridor nhưng vẫn có road hint, controller tiến chậm về phía rộng hơn; mất lane mà không có road hint thì dừng.
 
 ## Train Semantic
 
@@ -10,6 +10,47 @@ python yolo_lane_following/train_semantic.py --epochs 80 --device 0
 ```
 
 Dataset sinh ra tại `semantic_dataset/`: 1 PNG mask lossless cho mỗi ảnh, class ID 0..4 theo `data.yaml`. `workers=0` là mặc định để không lỗi shared-memory trên Jetson/container.
+
+Model thi đấu hiện tại là `track_yolo26n_sem_cube_best.pt`. Nó được fine-tune từ
+model lane gốc (không train lại từ đầu) với cube 5--10 cm có nhiều màu, bóng và
+phối cảnh. Tạo lại mẫu và đo riêng obstacle bằng:
+
+```bash
+python3 yolo_lane_following/augment_cube_obstacles.py --copies 1
+python3 yolo_lane_following/train_semantic.py \
+  --model yolo_lane_following/artifacts/track_yolo26n_sem_best.pt \
+  --epochs 24 --batch 4 --name track_yolo26n_sem_cube_finetune \
+  --output-name track_yolo26n_sem_cube_best.pt
+python3 yolo_lane_following/evaluate_semantic_obstacle.py \
+  --model yolo_lane_following/artifacts/track_yolo26n_sem_cube_best.pt \
+  --pattern '*_cube_*.jpg' --all-classes
+```
+
+Trên split validation hiện tại, checkpoint cube đạt obstacle recall `0.9755` và
+IoU `0.9161` trên 98 ảnh cube tổng hợp. So với engine gốc, mean IoU trên cube tăng
+`0.7243 -> 0.8255`; mean IoU trên ảnh gốc thay đổi `0.8279 -> 0.8227`. Trung bình
+cân bằng hai split tăng `0.7761 -> 0.8241`, nên checkpoint cube hiện được chọn thay
+vì train thêm khi chưa có ảnh cube thật. Đây không thay thế ảnh cube thật trên sa bàn.
+
+Trên replay 102 frame không có cube, engine mới có cùng median lane confidence
+`0.5645`, target jump median thấp hơn (`5.129` so với `5.511` pixel), cùng giới hạn
+steering delta `0.16`; có 3 dropout đơn-frame được controller giảm ga mượt, trong
+khi engine gốc không dropout trên đoạn ngắn này.
+
+Smoke tích hợp dưới đây tạo lane lock bằng ảnh sạch, sau đó lặp ảnh cube để kiểm tra
+chuỗi model -> temporal confirmation -> planner -> controller mà không load motor:
+
+```bash
+python3 yolo_lane_following/smoke_semantic_controller.py \
+  --preroll-image yolo_lane_following/semantic_dataset/images/val/track_s01_000032.jpg \
+  --image yolo_lane_following/semantic_dataset/images/val/track_s01_000032_cube_09cm_00.jpg \
+  --model yolo_lane_following/artifacts/track_yolo26n_sem_cube_nano_fp16.engine
+```
+
+Kết quả hiện tại xác nhận obstacle ở frame thứ ba (`risk=0.798`), luôn tiến với
+`avoid:obstacle`, ga ramp `0.03 -> 0.06 -> 0.09 -> 0.12` và không phát
+`reverse:obstacle`. Nếu sau `4.0 s` vẫn không lấy lại divider, controller chuyển
+sang `stop:obstacle_no_divider`, ramp lái về 0 và giữ ga 0 cho đến khi risk giảm.
 
 ## Dry Run
 
@@ -38,7 +79,9 @@ nhưng thay nhận diện lane theo ngưỡng màu bằng YOLO26 segmentation.
 3. Mask divider được fit đa thức theo trục dọc. Điểm preview của divider là mục tiêu,
    vì `target_mode: divider` yêu cầu tâm camera nằm trên đường phân cách.
 4. PID + heading preview tự sinh steering. Throttle tự giảm theo độ cong, confidence
-   và khoảng gần vật cản; mất divider quá 3 frame hoặc vật cản quá gần thì dừng.
+   và khoảng gần vật cản; mất divider quá 3 frame mà không có road hint thì dừng.
+   Đoạn thẳng sạch tăng dần đến `throttle_max`; góc cua yêu cầu giảm ga ngay cả khi
+   steering đang được slew/filter để tránh lao vào cua rồi mới giảm.
 
 Không có thuật toán nào bảo đảm bám đường “tuyệt đối”. Chất lượng phụ thuộc nhãn,
 camera calibration, độ trễ và độ bám cơ khí. Vì an toàn, chương trình mặc định dry-run;
@@ -117,6 +160,12 @@ Một dry-run tham chiếu bằng model `.pt` trên RTX 3090, video 102 frame đ
 40.1 FPS / 24.4 ms sau warm-up. Đây chỉ là kiểm tra pipeline, không thay thế benchmark
 TensorRT trên Jetson đích.
 
+Dry-run CSI trực tiếp trên Jetson Nano với engine cube FP16 hiện tại đạt `23.9 FPS`
+và median latency `41.8 ms` trên 709 frame. Camera lúc đo nhìn vào một phòng clutter,
+không phải sa bàn; dù obstacle risk lên `0.729`, lane-lock confirmation giữ `0`
+throttle trên toàn bộ 709 frame. Đây là bằng chứng runtime/camera và fail-safe,
+chưa phải kiểm thử lái xe.
+
 ## 4. Chạy xe
 
 Đặt xe lên giá kê bánh, chỉnh `steering_gain/offset`, xác nhận chiều lái, thử ga thấp,
@@ -128,3 +177,26 @@ python yolo_lane_following/run.py --source camera --arm
 
 Các ngưỡng ga/góc lái nằm trong `config.yaml`. Không tăng `throttle_max` trước khi
 log cho thấy divider confidence ổn định và fail-safe dừng đúng.
+
+Controller không được khởi tạo maneuver trắng hoặc vật cản trước khi có lane hợp lệ
+hoặc đã từng khóa lane. Vì vậy ARM khi camera chưa nhìn thấy đường vẫn giữ ga bằng 0.
+
+### Thu bằng chứng cube và đèn xanh thật, không có motor
+
+Đặt xe/camera cố định, lần lượt đưa cube và hình tròn xanh sáng vào khung hình rồi chạy:
+
+```bash
+python3 yolo_lane_following/validate_live_safety.py --duration 30
+```
+
+Script này không import `JetRacerController`, không có tùy chọn ARM và không thể ghi
+lệnh motor. CSV cùng ảnh `obstacle_confirmed_*.jpg` / `green_confirmed_*.jpg` được
+lưu trong `artifacts/live_validation/`. Chỉ coi validation đạt khi ảnh lưu cho thấy
+đúng vật thật, không dựa riêng vào số risk.
+
+Trong notebook, `COMPETITION` tắt nghĩa là chỉ cần bật `ARM MOTOR`: notebook tự đổi
+sang `live` và xe chạy khi controller có lane-lock an toàn. Khi bật `COMPETITION`,
+ARM cũng tự mở live nhưng motor vẫn dừng cho đến khi thấy hình tròn xanh lá sáng đủ
+3 frame liên tiếp; quyền start sau đó được latch đến khi Stop, bỏ ARM hoặc đổi chế độ.
+CSV ghi thêm `start_latency_ms`; detector xanh riêng lẻ đo median `1.236 ms`, p99
+`1.408 ms` trên Jetson. Latency end-to-end vẫn phải xác nhận bằng đèn BTC thật.

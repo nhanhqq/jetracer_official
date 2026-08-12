@@ -4,7 +4,7 @@ camera:
   capture_fps: 60
 
 models:
-  semantic: artifacts/track_yolo26n_sem_best.pt
+  semantic: artifacts/track_yolo26n_sem_cube_best.pt
   imgsz: 224
   confidence: 0.35
   device: "0"
@@ -24,11 +24,14 @@ tracking:
   min_mask_pixels: 35
   confidence_ema: 0.35
   max_lost_frames: 3
+  lane_lock_confirm_frames: 3
+  lane_lock_min_confidence: 0.55
   vehicle_half_width: 13
   road_hint_min_ratio: 0.005
   front_roi_top_ratio: 0.62
   front_roi_left_ratio: 0.30
   front_roi_right_ratio: 0.70
+  obstacle_confirm_frames: 3
 
 control:
   steering_gain: -0.65       # hardware calibration, inherited from notebook3
@@ -39,16 +42,23 @@ control:
   kd: 0.10
   heading_gain: 0.42
   max_steering: 0.82
-  max_steering_step: 0.18
-  maneuver_steering_step: 0.24
+  # Restore the calmer normal steering slew from the previous commit. Tight
+  # safety manoeuvres have their own bounded rate below.
+  max_steering_step: 0.16
+  maneuver_steering_step: 0.20
+  maneuver_throttle_step_up: 0.03
+  maneuver_throttle_step_down: 0.05
+  steering_target_alpha: 0.60
   throttle_min: 0.09
   throttle_cruise: 0.23
   throttle_max: 0.32
   throttle_limit_min: 0.08
   throttle_limit_max: 0.60
   throttle_step_up: 0.012
-  throttle_step_down: 0.035
+  throttle_step_down: 0.025
   curve_slowdown: 0.62
+  straight_boost_start: 0.06
+  straight_boost_end: 0.22
   low_confidence_slowdown: 0.55
   emergency_obstacle_ratio: 0.78
   obstacle_slow_ratio: 0.58
@@ -62,10 +72,11 @@ control:
   lane_reacquire_steering: 0.58
   lane_reacquire_throttle: 0.10
   obstacle_avoid_time: 2.0
+  obstacle_avoid_max_time: 4.0
   obstacle_avoid_throttle: 0.18
-  obstacle_avoid_steering: 0.74
-  obstacle_preempt_steering_step: 0.72
-  obstacle_avoid_steering_limit: 0.82
+  obstacle_avoid_steering: 0.62
+  obstacle_preempt_steering_step: 0.32
+  obstacle_avoid_steering_limit: 0.68
   avoid_retry_time: 0.25
   avoid_hold_time: 0.45
   white_correct_time: 0.30
@@ -76,8 +87,18 @@ control:
   white_side_threshold: 0.12
   white_side_margin: 0.04
 
+competition:
+  hsv_lower: [38, 100, 120]
+  hsv_upper: [88, 255, 255]
+  min_area_ratio: 0.002
+  max_area_ratio: 0.20
+  min_circularity: 0.82
+  confirm_frames: 3
+  latch_start: true
+
 runtime:
   log_dir: logs
   log_every: 10
+  display_stride: 3
   display: false
   dry_run: true

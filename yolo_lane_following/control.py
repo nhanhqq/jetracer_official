@@ -18,7 +18,6 @@ def is_motor_command_state(state: str) -> bool:
             state.startswith("avoid:") or
             state.startswith("reverse:white") or
             state.startswith("neutral:white") or
-            state.startswith("reverse:obstacle") or
             state.startswith("neutral:obstacle"))
 
 
@@ -37,10 +36,12 @@ class AdaptiveController:
         }
         self.integral = 0.0
         self.last_error = 0.0
+        self.last_raw_steering = 0.0
         self.last_steering = 0.0
         self.last_throttle = 0.0
         self.lost_frames = 0
         self.has_lane_lock = False
+        self.lane_lock_frames = 0
 
     def set_throttle_limit(self, requested: float) -> float:
         """Apply a live speed cap without allowing fixed manoeuvre speeds past it."""
@@ -84,6 +85,14 @@ class AdaptiveController:
         white_front_threshold = float(c.get("white_front_reverse_threshold", 0.58))
         white_front_required = int(c.get("white_front_reverse_frames", 2))
         obstacle_trigger = float(c.get("obstacle_slow_ratio", 0.58))
+        if not self.has_lane_lock:
+            lock_confidence = float(c.get("lane_lock_min_confidence", 0.0))
+            if lane.valid and lane.confidence >= lock_confidence:
+                self.lane_lock_frames += 1
+            else:
+                self.lane_lock_frames = 0
+            if self.lane_lock_frames >= int(c.get("lane_lock_confirm_frames", 1)):
+                self.has_lane_lock = True
 
         # Safety manoeuvres are latched.  Without a latch, a changing mask can
         # alternate between forward and stop/steer commands every frame.
@@ -95,10 +104,14 @@ class AdaptiveController:
             self.maneuver_preempted = False
             self.white_cooldown_time = 0.0
             self.white_front_frames = 0
+            self.obstacle_avoid_elapsed = 0.0
+            self.obstacle_timeout_latched = False
         self.white_cooldown_time = max(0.0, self.white_cooldown_time - elapsed)
         white_left = forbidden_left >= white_threshold and forbidden_left > forbidden_right + white_margin
         white_right = forbidden_right >= white_threshold and forbidden_right > forbidden_left + white_margin
         obstacle_active = obstacle >= obstacle_trigger
+        if obstacle < obstacle_trigger * 0.70:
+            self.obstacle_timeout_latched = False
         if forbidden_front >= white_front_threshold:
             self.white_front_frames += 1
         else:
@@ -107,26 +120,28 @@ class AdaptiveController:
 
         # Obstacle has priority over shoulder recovery. Live telemetry showed
         # long white-mask latches suppressing avoidance despite high YOLO risk.
-        if obstacle_active and (self.maneuver is None or not self.maneuver.startswith("obstacle_")):
+        has_safety_context = self.has_lane_lock
+        obstacle_context = has_safety_context and lane.source != "lost"
+        if (obstacle_context and obstacle_active and not self.obstacle_timeout_latched and
+                (self.maneuver is None or not self.maneuver.startswith("obstacle_"))):
             self.maneuver_preempted = self.maneuver is not None
-            blocked = not lane.valid or lane.source == "blocked"
-            moving_forward = self.last_throttle > 0.0
-            if blocked:
-                self.maneuver = "obstacle_neutral" if moving_forward else "obstacle_reverse"
-                self.maneuver_time = neutral_time if moving_forward else reverse_time
-            elif self.last_throttle < 0.0:
-                self.maneuver = "obstacle_reverse"
-                self.maneuver_time = reverse_time
+            if self.last_throttle < 0.0:
+                # Ordinary obstacles never request reverse. If white recovery
+                # was already reversing, give the ESC a neutral interval before
+                # resuming the requested forward detour.
+                self.maneuver = "obstacle_forward_neutral"
+                self.maneuver_time = neutral_time
             else:
                 self.maneuver = "obstacle_avoid"
                 self.maneuver_time = float(c.get("obstacle_avoid_time", 2.0))
             self.maneuver_frames = 0
+            self.obstacle_avoid_elapsed = 0.0
             self.maneuver_steering = float(np.sign(lane.target_x - width / 2.0))
             if escape_steering != 0.0:
                 self.maneuver_steering = float(np.sign(escape_steering))
             if self.maneuver_steering == 0.0:
                 self.maneuver_steering = -1.0 if forbidden_left > forbidden_right else 1.0
-        elif self.maneuver is None:
+        elif self.maneuver is None and has_safety_context:
             if self.white_cooldown_time <= 0.0 and white_front_blocked:
                 moving_forward = self.last_throttle > 0.0
                 self.maneuver = "white_neutral" if moving_forward else "white_reverse"
@@ -147,6 +162,8 @@ class AdaptiveController:
             if self.maneuver_frames > 0:
                 self.maneuver_time -= elapsed
             self.maneuver_frames += 1
+            if self.maneuver.startswith("obstacle_"):
+                self.obstacle_avoid_elapsed += elapsed
             maneuver_gain = (c.get("obstacle_avoid_steering", 0.72)
                              if self.maneuver.startswith("obstacle_")
                              else c.get("recovery_steering", 0.42))
@@ -161,7 +178,11 @@ class AdaptiveController:
                 # skipped frame.  The next command can therefore engage reverse.
                 self.last_steering = steer
                 self.last_throttle = 0.0
-                if self.maneuver_time <= 0.0:
+                if self.maneuver_time <= 0.0 and self.maneuver == "obstacle_forward_neutral":
+                    self.maneuver = "obstacle_avoid"
+                    self.maneuver_time = float(c.get("obstacle_avoid_time", 2.0))
+                    self.maneuver_frames = 0
+                elif self.maneuver_time <= 0.0:
                     prefix = self.maneuver.split("_")[0]
                     self.maneuver = prefix + "_reverse"
                     self.maneuver_time = reverse_time * (0.75 if prefix == "white" else 1.0)
@@ -181,15 +202,21 @@ class AdaptiveController:
                 self.maneuver = "white_correct"
                 self.maneuver_time = float(c.get("white_correct_time", 0.30))
                 self.maneuver_frames = 0
-            elif self.maneuver == "obstacle_reverse":
-                self.maneuver = "obstacle_avoid"
-                self.maneuver_time = float(c.get("obstacle_avoid_time", 2.0))
-                self.maneuver_frames = 0
             elif self.maneuver == "white_correct":
                 if self.maneuver_time <= 1e-6:
                     self.maneuver = None
                     self.white_cooldown_time = float(c.get("white_recovery_cooldown", 0.40))
             elif self.maneuver == "obstacle_avoid":
+                if (self.obstacle_avoid_elapsed >=
+                        float(c.get("obstacle_avoid_max_time", 4.0))):
+                    self.maneuver = None
+                    self.obstacle_timeout_latched = True
+                    self.last_throttle = 0.0
+                    self.last_steering = self._approach(
+                        self.last_steering, 0.0,
+                        c["max_steering_step"], c["max_steering_step"])
+                    return ControlCommand(self.last_steering, 0.0,
+                                          "stop:obstacle_no_divider")
                 if (self.maneuver_time <= 1e-6 and
                         obstacle < obstacle_trigger * 0.70 and lane.source == "divider"):
                     self.maneuver = None
@@ -206,16 +233,28 @@ class AdaptiveController:
                     "obstacle_avoid_throttle" if self.maneuver == "obstacle_avoid" else "recovery_throttle",
                     c["throttle_min"],
                 ))
+                throttle = self._approach(
+                    self.last_throttle, throttle,
+                    float(c.get("maneuver_throttle_step_up", c["throttle_step_up"])),
+                    float(c.get("maneuver_throttle_step_down", c["throttle_step_down"])),
+                )
                 self.last_steering, self.last_throttle = steer, throttle
                 self.maneuver_preempted = False
                 return ControlCommand(steer, throttle, "avoid:" + self.maneuver.split("_")[0])
             self.maneuver_preempted = False
 
+        if self.obstacle_timeout_latched:
+            self.last_throttle = 0.0
+            self.last_steering = self._approach(
+                self.last_steering, 0.0,
+                c["max_steering_step"], c["max_steering_step"])
+            return ControlCommand(self.last_steering, 0.0,
+                                  "stop:obstacle_no_divider")
+
         if not lane.valid:
             self.lost_frames += 1
         else:
             self.lost_frames = 0
-            self.has_lane_lock = True
 
         if self.lost_frames > int(c["max_lost_frames"]):
             self.integral = 0.0
@@ -232,7 +271,13 @@ class AdaptiveController:
             self.last_steering = self._approach(self.last_steering, 0.0, c["max_steering_step"], c["max_steering_step"])
             return ControlCommand(self.last_steering, 0.0, "stop:lane_lost")
 
-        # Never start moving before perception has acquired a lane.  Once locked,
+        # Never start moving before perception has acquired a persistent lane.
+        if not self.has_lane_lock:
+            self.last_throttle = self._approach(
+                self.last_throttle, 0.0, c["throttle_step_up"], c["throttle_step_down"])
+            return ControlCommand(self.last_steering, self.last_throttle, "wait:lane_lock")
+
+        # Once locked,
         # a short dropout is debounced while throttle ramps down instead of up.
         if not lane.valid:
             self.last_throttle = self._approach(
@@ -246,17 +291,30 @@ class AdaptiveController:
         derivative = (error - self.last_error) / dt
         raw = c["kp"] * error + c["ki"] * self.integral + c["kd"] * derivative + c["heading_gain"] * lane.heading_error
         raw = float(np.clip(raw, -c["max_steering"], c["max_steering"]))
-        steering = self._approach(self.last_steering, raw, c["max_steering_step"], c["max_steering_step"])
+        # Filter the target before applying the slew limit. Segmentation target
+        # jitter can otherwise alternate the wheel direction at inference FPS.
+        alpha = float(np.clip(c.get("steering_target_alpha", 1.0), 0.0, 1.0))
+        filtered_raw = alpha * raw + (1.0 - alpha) * self.last_raw_steering
+        steering = self._approach(self.last_steering, filtered_raw,
+                                  c["max_steering_step"], c["max_steering_step"])
 
-        curve_load = max(abs(steering), lane.curvature)
+        # Slow down from the requested turn, before the smoothed wheel command
+        # has fully caught up. This preserves smooth steering without entering
+        # a corner at straight-line speed.
+        curve_load = max(abs(raw), abs(lane.heading_error), lane.curvature)
         speed_scale = max(0.28, 1.0 - c["curve_slowdown"] * curve_load)
         confidence_scale = c["low_confidence_slowdown"] + (1.0 - c["low_confidence_slowdown"]) * lane.confidence
         obstacle_scale = max(0.25, 1.0 - obstacle) if obstacle >= c["obstacle_slow_ratio"] else 1.0
         if lane.source == "avoid":
             obstacle_scale = min(obstacle_scale, c["avoidance_speed_scale"])
-        target_throttle = float(np.clip(c["throttle_cruise"] * speed_scale * confidence_scale * obstacle_scale,
+        boost_start = float(c.get("straight_boost_start", 0.06))
+        boost_end = max(boost_start + 1e-6, float(c.get("straight_boost_end", 0.22)))
+        straightness = float(np.clip((boost_end - curve_load) / (boost_end - boost_start), 0.0, 1.0))
+        speed_base = c["throttle_cruise"] + straightness * (c["throttle_max"] - c["throttle_cruise"])
+        target_throttle = float(np.clip(speed_base * speed_scale * confidence_scale * obstacle_scale,
                                         c["throttle_min"], c["throttle_max"]))
         throttle = self._approach(self.last_throttle, target_throttle, c["throttle_step_up"], c["throttle_step_down"])
-        self.last_error, self.last_steering, self.last_throttle = error, steering, throttle
+        self.last_error, self.last_raw_steering = error, filtered_raw
+        self.last_steering, self.last_throttle = steering, throttle
         state = "avoid" if lane.source == "avoid" else ("slow:obstacle" if obstacle >= c["obstacle_slow_ratio"] else "follow")
         return ControlCommand(steering, throttle, state)

@@ -1,0 +1,2 @@
+time,fps,latency_ms,lane_conf,target_x,risk,steering,throttle,state
+1786526192.0020874,0.03942478801403348,25364.853008999944,0.0,112.0,0.0,0.0,0.0,wait:lane_lock

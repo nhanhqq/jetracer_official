@@ -21,18 +21,23 @@ def main() -> None:
     parser.add_argument("--workers", type=int, default=0,
                         help="0 avoids shared-memory DataLoader failures on Jetson/containers")
     parser.add_argument("--name", default="track_yolo26n_sem")
+    parser.add_argument("--output-name", default="track_yolo26n_sem_best.pt",
+                        help="artifact filename for the selected best checkpoint")
+    parser.add_argument("--cache", action="store_true",
+                        help="cache images in RAM; leave off on Jetson Nano")
     args = parser.parse_args()
     model = YOLO(args.model)
     result = model.train(data=str(args.data.resolve()), epochs=args.epochs, imgsz=args.imgsz,
-                         batch=args.batch, device=args.device, workers=args.workers, cache=True,
+                         batch=args.batch, device=args.device, workers=args.workers, cache=args.cache,
                          project=str(ROOT / "runs"), name=args.name, exist_ok=True, patience=20,
                          seed=2608, degrees=4, translate=0.08, scale=0.22, hsv_h=0.01,
                          hsv_s=0.20, hsv_v=0.25, mosaic=0.15, close_mosaic=10)
     best = Path(result.save_dir) / "weights" / "best.pt"
     artifacts = ROOT / "artifacts"
     artifacts.mkdir(exist_ok=True)
-    shutil.copy2(best, artifacts / "track_yolo26n_sem_best.pt")
-    print("Best semantic model:", artifacts / "track_yolo26n_sem_best.pt")
+    output = artifacts / args.output_name
+    shutil.copy2(best, output)
+    print("Best semantic model:", output)
 
 
 if __name__ == "__main__":
