@@ -4,7 +4,7 @@ camera:
   capture_fps: 60
 
 models:
-  semantic: artifacts/track_yolo26n_sem_cube_best.pt
+  semantic: artifacts/track_yolo26n_sem_cube_nano_fp16.engine
   imgsz: 224
   confidence: 0.35
   device: "0"
@@ -18,7 +18,7 @@ semantic_classes:
 
 tracking:
   target_mode: divider       # keep camera centre on the physical divider
-  lookahead_ratio: 0.62
+  lookahead_ratio: 0.60
   bottom_ratio: 0.93
   roi_top_ratio: 0.45
   min_mask_pixels: 35
@@ -31,52 +31,51 @@ tracking:
   front_roi_top_ratio: 0.62
   front_roi_left_ratio: 0.30
   front_roi_right_ratio: 0.70
-  obstacle_confirm_frames: 3
+  obstacle_confirm_frames: 2
 
 control:
   steering_gain: -0.65       # hardware calibration, inherited from notebook3
   steering_offset: 0.0
-  throttle_gain: 0.8
+  throttle_gain: 1.0         # 100% full motor power output
   kp: 0.92
   ki: 0.02
   kd: 0.10
   heading_gain: 0.42
-  max_steering: 0.82
-  # Restore the calmer normal steering slew from the previous commit. Tight
-  # safety manoeuvres have their own bounded rate below.
-  max_steering_step: 0.16
-  maneuver_steering_step: 0.20
-  maneuver_throttle_step_up: 0.03
-  maneuver_throttle_step_down: 0.05
-  steering_target_alpha: 0.60
-  throttle_min: 0.09
-  throttle_cruise: 0.23
-  throttle_max: 0.32
-  throttle_limit_min: 0.08
-  throttle_limit_max: 0.60
-  throttle_step_up: 0.012
-  throttle_step_down: 0.025
-  curve_slowdown: 0.62
-  straight_boost_start: 0.06
-  straight_boost_end: 0.22
-  low_confidence_slowdown: 0.55
+  max_steering: 1.00         # Maximum steering lock (100% full wheel turn)
+  # Steering rate limit set to instant full response
+  max_steering_step: 1.00    # Instantaneous wheel turn to max lock without lag
+  maneuver_steering_step: 1.00
+  maneuver_throttle_step_up: 1.00
+  maneuver_throttle_step_down: 1.00
+  steering_target_alpha: 1.00 # 0 delay filtering on steering target
+  throttle_min: 1.00         # Keep maximum 100% throttle in all corners and maneuvers
+  throttle_cruise: 1.00      # 100% cruise throttle
+  throttle_max: 1.00         # 100% max throttle
+  throttle_limit_min: 0.10
+  throttle_limit_max: 1.00
+  throttle_step_up: 1.00     # Instant throttle response to 100%
+  throttle_step_down: 1.00
+  curve_slowdown: 0.00       # 0% slowdown on curves (no reduction in corners)
+  straight_boost_start: 0.10
+  straight_boost_end: 0.30
+  low_confidence_slowdown: 1.00 # No slowdown even if confidence drops
   emergency_obstacle_ratio: 0.78
   obstacle_slow_ratio: 0.58
-  avoidance_speed_scale: 0.45
+  avoidance_speed_scale: 1.00 # 100% full speed during obstacle avoidance
   # ESC needs a neutral command before changing from forward to reverse.
   reverse_neutral_time: 0.12
   reverse_time: 0.35
-  reverse_throttle: 0.11
-  recovery_steering: 0.44
-  recovery_throttle: 0.12
-  lane_reacquire_steering: 0.58
-  lane_reacquire_throttle: 0.10
+  reverse_throttle: 0.20
+  recovery_steering: 1.00    # 100% max steering lock on recovery
+  recovery_throttle: 1.00    # 100% full throttle on recovery
+  lane_reacquire_steering: 1.00 # 100% max steering lock on reacquire
+  lane_reacquire_throttle: 1.00 # 100% full throttle on reacquire
   obstacle_avoid_time: 2.0
   obstacle_avoid_max_time: 4.0
-  obstacle_avoid_throttle: 0.18
-  obstacle_avoid_steering: 0.62
-  obstacle_preempt_steering_step: 0.32
-  obstacle_avoid_steering_limit: 0.68
+  obstacle_avoid_throttle: 1.00 # 100% full throttle during avoidance
+  obstacle_avoid_steering: 1.00 # 100% full steering lock during avoidance
+  obstacle_preempt_steering_step: 1.00
+  obstacle_avoid_steering_limit: 1.00
   avoid_retry_time: 0.25
   avoid_hold_time: 0.45
   white_correct_time: 0.30
