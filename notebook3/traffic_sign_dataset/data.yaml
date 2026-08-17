@@ -1,0 +1,10 @@
+path: D:/jetracer_official/notebook3/traffic_sign_dataset
+train: images/train
+val: images/val
+names:
+  0: bien_cam
+  1: di_thang
+  2: re_phai
+  3: re_trai
+  4: den_do
+  5: den_xanh

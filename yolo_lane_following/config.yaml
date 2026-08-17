@@ -1,0 +1,103 @@
+camera:
+  width: 224
+  height: 224
+  capture_fps: 60
+
+models:
+  semantic: artifacts/track_yolo26n_sem_cube_nano_fp16.engine
+  imgsz: 224
+  confidence: 0.35
+  device: "0"
+
+semantic_classes:
+  background: 0
+  road: 1
+  divider: 2
+  forbidden: 3
+  obstacle: 4
+
+tracking:
+  target_mode: divider       # keep camera centre on the physical divider
+  lookahead_ratio: 0.60
+  bottom_ratio: 0.93
+  roi_top_ratio: 0.45
+  min_mask_pixels: 35
+  confidence_ema: 0.35
+  max_lost_frames: 3
+  lane_lock_confirm_frames: 3
+  lane_lock_min_confidence: 0.55
+  vehicle_half_width: 13
+  road_hint_min_ratio: 0.005
+  front_roi_top_ratio: 0.62
+  front_roi_left_ratio: 0.30
+  front_roi_right_ratio: 0.70
+  obstacle_confirm_frames: 2
+
+control:
+  steering_gain: -0.65       # hardware calibration, inherited from notebook3
+  steering_offset: 0.0
+  throttle_gain: 1.0         # 100% full motor power output
+  kp: 0.92
+  ki: 0.02
+  kd: 0.10
+  heading_gain: 0.42
+  max_steering: 1.00         # Maximum steering lock (100% full wheel turn)
+  # Steering rate limit set to rapid response
+  max_steering_step: 0.45    # Very fast steering response to track at high speed
+  maneuver_steering_step: 0.50
+  maneuver_throttle_step_up: 0.25      # 25% maneuver acceleration step
+  maneuver_throttle_step_down: 0.35    # 35% maneuver deceleration step
+  steering_target_alpha: 0.85 # Quick steering update with minimal smoothing
+  throttle_min: 0.40         # High floor speed to carry momentum in sharp corners (was 0.09)
+  throttle_cruise: 0.85      # High cruise speed (was 0.23)
+  throttle_max: 1.00         # Maximum hardware throttle (100%)
+  throttle_limit_min: 0.10
+  throttle_limit_max: 1.00
+  throttle_step_up: 0.25     # 25% throttle acceleration step per frame
+  throttle_step_down: 0.35   # 35% throttle deceleration step per frame
+  curve_slowdown: 0.15       # Minimal slowdown on curves (was 0.62) to maintain high cornering speed
+  straight_boost_start: 0.35 # Boosts to 1.00 even on moderate curves (was 0.06)
+  straight_boost_end: 0.55   # End boost only on very sharp curves (was 0.22)
+  low_confidence_slowdown: 1.00 # No slowdown even if confidence drops
+  emergency_obstacle_ratio: 1.00
+  obstacle_slow_ratio: 1.00  # Never slow down for obstacles (was 0.75)
+  avoidance_speed_scale: 1.00 # Maintain 100% speed during obstacle avoidance
+  # ESC needs a neutral command before changing from forward to reverse.
+  reverse_neutral_time: 0.00 # Instant reverse transition
+  reverse_time: 0.10         # Extremely fast reverse duration
+  reverse_throttle: 1.00     # 100% full throttle reverse
+  recovery_steering: 1.00    
+  recovery_throttle: 1.00    # 100% throttle on recovery
+  lane_reacquire_steering: 1.00 
+  lane_reacquire_throttle: 1.00 # 100% throttle on reacquire
+  obstacle_avoid_time: 0.10  # Fast avoidance execution
+  obstacle_avoid_max_time: 0.50
+  obstacle_avoid_throttle: 1.00 # 100% throttle during avoidance
+  obstacle_avoid_steering: 1.00 
+  obstacle_preempt_steering_step: 1.00
+  obstacle_avoid_steering_limit: 1.00
+  avoid_retry_time: 0.00
+  avoid_hold_time: 0.00
+  white_correct_time: 0.00
+  white_side_correct_time: 0.00
+  white_recovery_cooldown: 0.00
+  white_front_reverse_threshold: 1.00 # Ignore front white boundary unless 1.0
+  white_front_reverse_frames: 999  # Never reverse for white line front blockage
+  white_side_threshold: 1.00       # Ignore white side line boundary unless 1.0
+  white_side_margin: 0.00
+
+competition:
+  hsv_lower: [38, 100, 120]
+  hsv_upper: [88, 255, 255]
+  min_area_ratio: 0.002
+  max_area_ratio: 0.20
+  min_circularity: 0.82
+  confirm_frames: 3
+  latch_start: true
+
+runtime:
+  log_dir: logs
+  log_every: 10
+  display_stride: 3
+  display: false
+  dry_run: true

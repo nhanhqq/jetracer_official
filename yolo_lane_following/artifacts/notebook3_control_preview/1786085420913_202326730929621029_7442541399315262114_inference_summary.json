@@ -1,0 +1,18 @@
+{
+  "input": "/home/jetson/jetracer_official/notebook3/test/1786085420913_202326730929621029_7442541399315262114.mp4",
+  "output": "/home/jetson/jetracer_official/yolo_lane_following/artifacts/notebook3_control_preview/1786085420913_202326730929621029_7442541399315262114_inference.mp4",
+  "frames": 102,
+  "source_fps": 30.0,
+  "duration_s": 3.4,
+  "lane_confident_ratio": 0.9804,
+  "obstacle_frame_ratio": 0.0,
+  "left_turn_frame_ratio": 0.2157,
+  "right_turn_frame_ratio": 0.6471,
+  "mean_abs_steering": 0.32,
+  "mean_throttle_preview": 0.1194,
+  "target_jumps_over_45px": 0,
+  "mean_latency_ms": 47.258,
+  "offline_pipeline_fps": 12.32,
+  "uses_manual_labels": false,
+  "motor_output": false
+}

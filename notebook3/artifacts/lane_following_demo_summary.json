@@ -1,0 +1,12 @@
+{
+  "frames": 92,
+  "mae_x_px": 22.522,
+  "median_x_px": 17.0,
+  "p90_x_px": 48.9,
+  "within_20px_ratio": 0.6304,
+  "large_jump_over_45px": 0,
+  "lane_confident_ratio": 1.0,
+  "mean_latency_ms": 30.83,
+  "offline_pipeline_fps": 26.37,
+  "video": "D:\\jetracer_official\\notebook3\\artifacts\\lane_following_demo.mp4"
+}

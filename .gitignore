@@ -1,0 +1,28 @@
+# Crash dumps
+core
+core.*
+
+# Python caches
+__pycache__/
+*.py[cod]
+.ipynb_checkpoints/
+.DS_Store
+
+# Media and Datasets
+*.mp4
+*.avi
+*.mov
+*.jpg
+*.jpeg
+*.png
+*.bmp
+*.csv
+*.log
+
+# Allow .gitkeep
+!.gitkeep
+
+# Generated waypoint training/runtime data
+waypoint_lane_fusion/dataset/
+waypoint_lane_fusion/logs/
+

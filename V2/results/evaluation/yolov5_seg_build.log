@@ -1,0 +1,114 @@
+&&&& RUNNING TensorRT.trtexec # /usr/src/tensorrt/bin/trtexec --onnx=V2/models/yolov5n-seg.onnx --saveEngine=V2/models/yolov5n-seg_fp16.engine --explicitBatch --fp16 --workspace=256 --minTiming=1 --avgTiming=1
+[08/09/2026-07:30:44] [I] === Model Options ===
+[08/09/2026-07:30:44] [I] Format: ONNX
+[08/09/2026-07:30:44] [I] Model: V2/models/yolov5n-seg.onnx
+[08/09/2026-07:30:44] [I] Output:
+[08/09/2026-07:30:44] [I] === Build Options ===
+[08/09/2026-07:30:44] [I] Max batch: explicit
+[08/09/2026-07:30:44] [I] Workspace: 256 MB
+[08/09/2026-07:30:44] [I] minTiming: 1
+[08/09/2026-07:30:44] [I] avgTiming: 1
+[08/09/2026-07:30:44] [I] Precision: FP32+FP16
+[08/09/2026-07:30:44] [I] Calibration: 
+[08/09/2026-07:30:44] [I] Safe mode: Disabled
+[08/09/2026-07:30:44] [I] Save engine: V2/models/yolov5n-seg_fp16.engine
+[08/09/2026-07:30:44] [I] Load engine: 
+[08/09/2026-07:30:44] [I] Builder Cache: Enabled
+[08/09/2026-07:30:44] [I] NVTX verbosity: 0
+[08/09/2026-07:30:44] [I] Inputs format: fp32:CHW
+[08/09/2026-07:30:44] [I] Outputs format: fp32:CHW
+[08/09/2026-07:30:44] [I] Input build shapes: model
+[08/09/2026-07:30:44] [I] Input calibration shapes: model
+[08/09/2026-07:30:44] [I] === System Options ===
+[08/09/2026-07:30:44] [I] Device: 0
+[08/09/2026-07:30:44] [I] DLACore: 
+[08/09/2026-07:30:44] [I] Plugins:
+[08/09/2026-07:30:44] [I] === Inference Options ===
+[08/09/2026-07:30:44] [I] Batch: Explicit
+[08/09/2026-07:30:44] [I] Input inference shapes: model
+[08/09/2026-07:30:44] [I] Iterations: 10
+[08/09/2026-07:30:44] [I] Duration: 3s (+ 200ms warm up)
+[08/09/2026-07:30:44] [I] Sleep time: 0ms
+[08/09/2026-07:30:44] [I] Streams: 1
+[08/09/2026-07:30:44] [I] ExposeDMA: Disabled
+[08/09/2026-07:30:44] [I] Spin-wait: Disabled
+[08/09/2026-07:30:44] [I] Multithreading: Disabled
+[08/09/2026-07:30:44] [I] CUDA Graph: Disabled
+[08/09/2026-07:30:44] [I] Skip inference: Disabled
+[08/09/2026-07:30:44] [I] Inputs:
+[08/09/2026-07:30:44] [I] === Reporting Options ===
+[08/09/2026-07:30:44] [I] Verbose: Disabled
+[08/09/2026-07:30:44] [I] Averages: 10 inferences
+[08/09/2026-07:30:44] [I] Percentile: 99
+[08/09/2026-07:30:44] [I] Dump output: Disabled
+[08/09/2026-07:30:44] [I] Profile: Disabled
+[08/09/2026-07:30:44] [I] Export timing to JSON file: 
+[08/09/2026-07:30:44] [I] Export output to JSON file: 
+[08/09/2026-07:30:44] [I] Export profile to JSON file: 
+[08/09/2026-07:30:44] [I] 
+----------------------------------------------------------------
+Input filename:   V2/models/yolov5n-seg.onnx
+ONNX IR version:  0.0.6
+Opset version:    12
+Producer name:    pytorch
+Producer version: 1.6
+Domain:           
+Model version:    0
+Doc string:       
+----------------------------------------------------------------
+[08/09/2026-07:30:45] [W] [TRT] onnx2trt_utils.cpp:220: Your ONNX model has been generated with INT64 weights, while TensorRT does not natively support INT64. Attempting to cast down to INT32.
+[08/09/2026-07:34:44] [I] [TRT] Some tactics do not have sufficient workspace memory to run. Increasing workspace size may increase performance, please check verbose output.
+[08/09/2026-07:37:36] [I] [TRT] Detected 1 inputs and 5 output network tensors.
+[08/09/2026-07:37:36] [I] Starting inference threads
+[08/09/2026-07:37:40] [I] Warmup completed 0 queries over 200 ms
+[08/09/2026-07:37:40] [I] Timing trace has 0 queries over 3.02023 s
+[08/09/2026-07:37:40] [I] Trace averages of 10 runs:
+[08/09/2026-07:37:40] [I] Average on 10 runs - GPU latency: 10.1074 ms - Host latency: 10.3596 ms (end to end 10.3731 ms, enqueue 10.0919 ms)
+[08/09/2026-07:37:40] [I] Average on 10 runs - GPU latency: 11.1881 ms - Host latency: 11.4692 ms (end to end 11.4836 ms, enqueue 11.0245 ms)
+[08/09/2026-07:37:40] [I] Average on 10 runs - GPU latency: 10.3269 ms - Host latency: 10.5771 ms (end to end 10.5903 ms, enqueue 10.2103 ms)
+[08/09/2026-07:37:40] [I] Average on 10 runs - GPU latency: 10.3532 ms - Host latency: 10.6042 ms (end to end 10.6166 ms, enqueue 10.0404 ms)
+[08/09/2026-07:37:40] [I] Average on 10 runs - GPU latency: 9.97838 ms - Host latency: 10.2239 ms (end to end 10.2342 ms, enqueue 6.42124 ms)
+[08/09/2026-07:37:40] [I] Average on 10 runs - GPU latency: 9.98333 ms - Host latency: 10.2286 ms (end to end 10.2381 ms, enqueue 6.7943 ms)
+[08/09/2026-07:37:40] [I] Average on 10 runs - GPU latency: 9.99082 ms - Host latency: 10.2394 ms (end to end 10.2492 ms, enqueue 6.65663 ms)
+[08/09/2026-07:37:40] [I] Average on 10 runs - GPU latency: 9.9879 ms - Host latency: 10.2303 ms (end to end 10.2401 ms, enqueue 6.69559 ms)
+[08/09/2026-07:37:40] [I] Average on 10 runs - GPU latency: 9.96909 ms - Host latency: 10.2147 ms (end to end 10.2243 ms, enqueue 7.02501 ms)
+[08/09/2026-07:37:40] [I] Average on 10 runs - GPU latency: 9.97731 ms - Host latency: 10.2211 ms (end to end 10.2306 ms, enqueue 6.98649 ms)
+[08/09/2026-07:37:40] [I] Average on 10 runs - GPU latency: 9.96631 ms - Host latency: 10.2091 ms (end to end 10.2188 ms, enqueue 7.04961 ms)
+[08/09/2026-07:37:40] [I] Average on 10 runs - GPU latency: 9.98168 ms - Host latency: 10.2316 ms (end to end 10.2411 ms, enqueue 7.45641 ms)
+[08/09/2026-07:37:40] [I] Average on 10 runs - GPU latency: 9.99943 ms - Host latency: 10.2466 ms (end to end 10.2558 ms, enqueue 6.98289 ms)
+[08/09/2026-07:37:40] [I] Average on 10 runs - GPU latency: 9.9848 ms - Host latency: 10.2288 ms (end to end 10.2382 ms, enqueue 6.54288 ms)
+[08/09/2026-07:37:40] [I] Average on 10 runs - GPU latency: 9.92319 ms - Host latency: 10.179 ms (end to end 10.1908 ms, enqueue 7.91613 ms)
+[08/09/2026-07:37:40] [I] Average on 10 runs - GPU latency: 9.99114 ms - Host latency: 10.236 ms (end to end 10.2454 ms, enqueue 6.56941 ms)
+[08/09/2026-07:37:40] [I] Average on 10 runs - GPU latency: 9.99475 ms - Host latency: 10.241 ms (end to end 10.2505 ms, enqueue 6.37046 ms)
+[08/09/2026-07:37:40] [I] Average on 10 runs - GPU latency: 9.98081 ms - Host latency: 10.2235 ms (end to end 10.2329 ms, enqueue 6.85178 ms)
+[08/09/2026-07:37:40] [I] Average on 10 runs - GPU latency: 9.96252 ms - Host latency: 10.2057 ms (end to end 10.2152 ms, enqueue 7.11731 ms)
+[08/09/2026-07:37:40] [I] Average on 10 runs - GPU latency: 9.98936 ms - Host latency: 10.2323 ms (end to end 10.2418 ms, enqueue 6.70269 ms)
+[08/09/2026-07:37:40] [I] Average on 10 runs - GPU latency: 9.98086 ms - Host latency: 10.2241 ms (end to end 10.2338 ms, enqueue 7.09729 ms)
+[08/09/2026-07:37:40] [I] Average on 10 runs - GPU latency: 9.95696 ms - Host latency: 10.1997 ms (end to end 10.2091 ms, enqueue 7.4186 ms)
+[08/09/2026-07:37:40] [I] Average on 10 runs - GPU latency: 9.97295 ms - Host latency: 10.2182 ms (end to end 10.2276 ms, enqueue 7.33152 ms)
+[08/09/2026-07:37:40] [I] Average on 10 runs - GPU latency: 9.96929 ms - Host latency: 10.2117 ms (end to end 10.2215 ms, enqueue 7.13132 ms)
+[08/09/2026-07:37:40] [I] Average on 10 runs - GPU latency: 9.96921 ms - Host latency: 10.2124 ms (end to end 10.2219 ms, enqueue 7.19978 ms)
+[08/09/2026-07:37:40] [I] Average on 10 runs - GPU latency: 9.99653 ms - Host latency: 10.2476 ms (end to end 10.2574 ms, enqueue 7.31121 ms)
+[08/09/2026-07:37:40] [I] Average on 10 runs - GPU latency: 9.99646 ms - Host latency: 10.2417 ms (end to end 10.251 ms, enqueue 6.59492 ms)
+[08/09/2026-07:37:40] [I] Average on 10 runs - GPU latency: 9.98232 ms - Host latency: 10.2269 ms (end to end 10.2361 ms, enqueue 6.93464 ms)
+[08/09/2026-07:37:40] [I] Average on 10 runs - GPU latency: 9.99307 ms - Host latency: 10.2376 ms (end to end 10.2471 ms, enqueue 6.75337 ms)
+[08/09/2026-07:37:40] [I] Host Latency
+[08/09/2026-07:37:40] [I] min: 10.0791 ms (end to end 10.0856 ms)
+[08/09/2026-07:37:40] [I] max: 12.7905 ms (end to end 12.7947 ms)
+[08/09/2026-07:37:40] [I] mean: 10.2971 ms (end to end 10.3072 ms)
+[08/09/2026-07:37:40] [I] median: 10.228 ms (end to end 10.238 ms)
+[08/09/2026-07:37:40] [I] percentile: 12.0204 ms at 99% (end to end 12.0453 ms at 99%)
+[08/09/2026-07:37:40] [I] throughput: 0 qps
+[08/09/2026-07:37:40] [I] walltime: 3.02023 s
+[08/09/2026-07:37:40] [I] Enqueue Time
+[08/09/2026-07:37:40] [I] min: 5.90448 ms
+[08/09/2026-07:37:40] [I] max: 14.85 ms
+[08/09/2026-07:37:40] [I] median: 6.97491 ms
+[08/09/2026-07:37:40] [I] GPU Compute
+[08/09/2026-07:37:40] [I] min: 9.83078 ms
+[08/09/2026-07:37:40] [I] max: 12.409 ms
+[08/09/2026-07:37:40] [I] mean: 10.05 ms
+[08/09/2026-07:37:40] [I] median: 9.98291 ms
+[08/09/2026-07:37:40] [I] percentile: 11.7299 ms at 99%
+[08/09/2026-07:37:40] [I] total compute time: 2.94465 s
+&&&& PASSED TensorRT.trtexec # /usr/src/tensorrt/bin/trtexec --onnx=V2/models/yolov5n-seg.onnx --saveEngine=V2/models/yolov5n-seg_fp16.engine --explicitBatch --fp16 --workspace=256 --minTiming=1 --avgTiming=1

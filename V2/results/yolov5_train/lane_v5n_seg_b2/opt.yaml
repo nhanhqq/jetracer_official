@@ -1,0 +1,41 @@
+batch_size: 2
+bucket: ''
+cache: null
+cfg: ''
+cos_lr: false
+data: V2/data/yolov5_seg_dataset/data.yaml
+device: '0'
+epochs: 5
+evolve: null
+exist_ok: true
+freeze: [0]
+hyp: {anchor_t: 4.0, box: 0.05, cls: 0.5, cls_pw: 1.0, copy_paste: 0.0, degrees: 0.0,
+  fl_gamma: 0.0, fliplr: 0.5, flipud: 0.0, hsv_h: 0.015, hsv_s: 0.7, hsv_v: 0.4, iou_t: 0.2,
+  lr0: 0.01, lrf: 0.01, mixup: 0.0, momentum: 0.937, mosaic: 1.0, obj: 1.0, obj_pw: 1.0,
+  perspective: 0.0, scale: 0.5, shear: 0.0, translate: 0.1, warmup_bias_lr: 0.1, warmup_epochs: 3.0,
+  warmup_momentum: 0.8, weight_decay: 0.0005}
+image_weights: false
+imgsz: 224
+label_smoothing: 0.0
+local_rank: -1
+mask_ratio: 4
+multi_scale: false
+name: lane_v5n_seg_b2
+no_overlap: false
+noautoanchor: false
+noplots: true
+nosave: false
+noval: true
+optimizer: SGD
+patience: 100
+project: V2/results/yolov5_train
+quad: false
+rect: false
+resume: true
+save_dir: V2/results/yolov5_train/lane_v5n_seg_b2
+save_period: -1
+seed: 0
+single_cls: false
+sync_bn: false
+weights: V2/results/yolov5_train/lane_v5n_seg_b2/weights/last.pt
+workers: 0

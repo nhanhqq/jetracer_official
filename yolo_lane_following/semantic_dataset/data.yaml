@@ -1,0 +1,10 @@
+path: /home/namphuongtran9196/jetracer_official/yolo_lane_following/semantic_dataset
+train: images/train
+val: images/val
+masks_dir: masks
+names:
+  0: background
+  1: road
+  2: divider
+  3: forbidden
+  4: obstacle

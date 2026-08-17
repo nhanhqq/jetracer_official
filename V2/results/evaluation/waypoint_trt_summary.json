@@ -1,0 +1,13 @@
+{
+  "engine": "V2/models/waypoint_baseline_fp16_rebuilt.engine",
+  "runtime": "TensorRT 7.1.3.0",
+  "input": "1x3x224x224 FP32 CHW",
+  "precision": "FP16 engine",
+  "cuda_graph": true,
+  "throughput_qps": 90.6949,
+  "gpu_compute_mean_ms": 10.9551,
+  "host_latency_mean_ms": 11.0157,
+  "end_to_end_mean_ms": 11.0254,
+  "end_to_end_p99_ms": 18.7497,
+  "status": "PASSED"
+}

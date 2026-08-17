@@ -1,0 +1,41 @@
+camera:
+  width: 224
+  height: 224
+  capture_fps: 30
+models:
+  waypoint: ../waypoint_lane_fusion/artifacts/lane_resnet18_bootstrap.onnx
+  waypoint_engine: ../V2/models/waypoint_baseline_fp16_rebuilt.engine
+  segmentation_engine: ../V2/models/yolov5n-seg-road_fp16.engine
+  input_size: 224
+  backend: yolov5_tensorrt
+geometry:
+  bands: [0.46, 0.56, 0.66, 0.78, 0.90]
+  divider_min_pixels: 8
+  divider_min_confidence: 0.32
+  divider_max_jump: 0.22
+  white_hard_ratio: 0.32
+  white_side_ratio: 0.12
+  obstacle_ratio_caution: 0.08
+control:
+  max_steering: 0.82
+  max_steering_step: 0.075
+  steering_alpha: 0.30
+  kp: 0.92
+  kd: 0.07
+  heading_gain: 0.34
+  throttle_min: 0.0
+  throttle_cruise: 0.18
+  throttle_max: 0.24
+  throttle_step_up: 0.006
+  throttle_step_down: 0.040
+  road_confidence_stop: 0.18
+  white_hard_ratio: 0.32
+  recovery_reverse: 0.07
+runtime:
+  output_root: results
+  segmentation_interval: 2
+  cv_safety_size: 128
+hardware:
+  steering_gain: -0.65
+  steering_offset: 0.0
+  throttle_gain: 0.8
