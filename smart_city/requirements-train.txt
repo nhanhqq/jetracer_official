@@ -1,0 +1,8 @@
+# Python 3.8 training environment. CUDA/Torch should come from the Jetson
+# Docker image or NVIDIA wheel, not from an unrestricted pip install.
+ultralytics==8.4.115
+PyYAML>=5.4,<7
+Pillow>=8.4,<11
+onnx>=1.12,<1.18
+onnxsim>=0.4.17,<0.5
+

@@ -1,0 +1,12 @@
+path: /home/namphuongtran9196/jetracer_official/smart_city/datasets/traffic
+train: images/train
+val: images/val
+names:
+  0: bien_cam
+  1: di_thang
+  2: re_phai
+  3: re_trai
+  4: den_do
+  5: den_xanh
+  6: crosswalk
+  7: stop_line

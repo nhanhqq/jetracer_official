@@ -1,0 +1,31 @@
+{
+  "actions": {
+    "FOLLOW_LANE": 327,
+    "STOP_LANE_LOST": 21,
+    "STOP_RED": 79
+  },
+  "armed": false,
+  "detections": {
+    "bien_cam": 4,
+    "crosswalk": 9,
+    "den_do": 22,
+    "den_xanh": 48,
+    "di_thang": 90,
+    "stop_line": 6
+  },
+  "lane_valid": 400,
+  "lane_valid_pct": 93.6768149882904,
+  "latency_ms": {
+    "max": 265.1213458739221,
+    "median": 105.71363614872098,
+    "p95": 193.75184713862836
+  },
+  "processed": 427,
+  "source": "/home/namphuongtran9196/JetRacer_AI/jetracer/notebooks/urban/urban_dataset_A",
+  "states": {
+    "DRIVE": 327,
+    "STOP_LANE_LOST": 21,
+    "STOP_RED": 79
+  },
+  "traffic_model": "artifacts/smart_city_yolo26n_urban_pseudo.onnx"
+}

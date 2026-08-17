@@ -1,0 +1,14 @@
+path: datasets/traffic
+train: images/train
+val: images/val
+
+# Base training classes match the existing Smart City traffic detector.
+names:
+  0: bien_cam
+  1: di_thang
+  2: re_phai
+  3: re_trai
+  4: den_do
+  5: den_xanh
+  6: crosswalk
+  7: stop_line

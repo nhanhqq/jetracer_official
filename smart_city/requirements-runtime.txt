@@ -1,0 +1,6 @@
+# Runtime-only dependencies; OpenCV/ONNX Runtime GPU may be supplied by the
+# Jetson Docker image instead of pip.
+numpy<2
+PyYAML>=5.4,<7
+onnxruntime
+

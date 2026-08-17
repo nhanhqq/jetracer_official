@@ -1,0 +1,50 @@
+camera:
+  width: 224
+  height: 224
+  capture_fps: 30
+
+models:
+  # Reuse the trained semantic lane weight from yolo_lane_following.
+  lane_onnx: ../yolo_lane_following/artifacts/track_yolo26n_sem_best.onnx
+  # Provisional urban-adapted YOLO26 weight. It includes unreviewed
+  # pseudo-labels; replace with the reviewed export before competition.
+  traffic_onnx: artifacts/smart_city_yolo26n_urban_pseudo.onnx
+  lane_input: 224
+  traffic_input: 320
+  traffic_confidence: 0.35
+
+lane:
+  road_class: 1
+  divider_class: 2
+  forbidden_class: 3
+  lookahead_ratio: 0.60
+  bottom_ratio: 0.93
+  min_pixels: 35
+
+control:
+  kp: 0.92
+  kd: 0.10
+  heading_gain: 0.42
+  steering_gain: -0.65
+  max_steering: 1.0
+  max_steering_step: 0.18
+  throttle: 0.16
+  stop_throttle: 0.0
+  turn_throttle: 0.10
+
+traffic:
+  red_confirm_frames: 2
+  green_confirm_frames: 2
+  sign_confirm_frames: 2
+  crosswalk_stop_frames: 2
+  intersection_timeout_s: 4.0
+  default_route: STRAIGHT
+  # Light priority is implemented before signs. A generic forbidden sign
+  # chooses LEFT/RIGHT using this replayable seed.
+  forbidden_direction: null
+  forbidden_random_seed: 2608
+
+runtime:
+  dry_run: true
+  display: false
+  log_dir: logs
