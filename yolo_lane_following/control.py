@@ -109,7 +109,10 @@ class AdaptiveController:
         self.white_cooldown_time = max(0.0, self.white_cooldown_time - elapsed)
         white_left = forbidden_left >= white_threshold and forbidden_left > forbidden_right + white_margin
         white_right = forbidden_right >= white_threshold and forbidden_right > forbidden_left + white_margin
-        obstacle_active = obstacle >= obstacle_trigger
+        # Lane-only deployments intentionally disable the legacy obstacle
+        # manoeuvre path even if a model/backend returns an extra class.
+        obstacle_active = (not bool(c.get("lane_only", False)) and
+                           obstacle >= obstacle_trigger)
         if obstacle < obstacle_trigger * 0.70:
             self.obstacle_timeout_latched = False
         if forbidden_front >= white_front_threshold:
@@ -318,5 +321,7 @@ class AdaptiveController:
         throttle = self._approach(self.last_throttle, target_throttle, c["throttle_step_up"], c["throttle_step_down"])
         self.last_error, self.last_raw_steering = error, filtered_raw
         self.last_steering, self.last_throttle = steering, throttle
-        state = "avoid" if lane.source == "avoid" else ("slow:obstacle" if obstacle >= c["obstacle_slow_ratio"] else "follow")
+        obstacle_state = (not bool(c.get("lane_only", False)) and
+                          obstacle >= c["obstacle_slow_ratio"])
+        state = "avoid" if lane.source == "avoid" else ("slow:obstacle" if obstacle_state else "follow")
         return ControlCommand(steering, throttle, state)

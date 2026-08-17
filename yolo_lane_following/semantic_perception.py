@@ -8,7 +8,7 @@ import cv2
 import numpy as np
 
 from .config import resolve_path
-from .geometry import LaneEstimate, estimate_lane, obstacle_risk, plan_semantic_lane
+from .geometry import LaneEstimate, estimate_lane, plan_semantic_lane
 
 
 @dataclass
@@ -37,7 +37,12 @@ class ConsecutiveRiskGate:
 
 
 class YoloSemanticPerception:
-    """Dense YOLO26 semantic output adapter for the track safety policy."""
+    """Dense YOLO26 adapter for lane following.
+
+    The model may still contain a legacy obstacle class in its output tensor,
+    but this runtime deliberately ignores it. Lane following uses only road,
+    divider and forbidden/shoulder masks.
+    """
 
     def __init__(self, cfg: dict):
         from ultralytics import YOLO
@@ -53,8 +58,6 @@ class YoloSemanticPerception:
         self.class_ids = {str(name).lower(): int(class_id)
                           for name, class_id in cfg["semantic_classes"].items()}
         self.last_target_x = None
-        self.obstacle_gate = ConsecutiveRiskGate(
-            cfg["tracking"].get("obstacle_confirm_frames", 1))
 
     def warmup(self) -> None:
         """Initialize the lazy backend before camera callbacks or motor gating."""
@@ -87,14 +90,10 @@ class YoloSemanticPerception:
         divider_lane = estimate_lane(masks["divider"], masks["road"],
                                      t["lookahead_ratio"], t["bottom_ratio"],
                                      t["roi_top_ratio"], t["min_mask_pixels"], "divider")
-        raw_obstacle = masks["obstacle"]
-        raw_boxes = self._boxes(raw_obstacle)
-        raw_risk = obstacle_risk(raw_boxes, frame.shape[1], frame.shape[0], divider_lane.near_x)
-        trigger = float(self.cfg["control"].get("obstacle_slow_ratio", 0.58))
-        obstacle_confirmed = self.obstacle_gate.update(raw_risk >= trigger)
-        if not obstacle_confirmed:
-            masks["obstacle"] = np.zeros_like(raw_obstacle)
-        lane = plan_semantic_lane(masks["divider"], masks["road"], masks["forbidden"], masks["obstacle"],
+        # Keep the planner contract stable, but pass an empty obstacle mask so
+        # no obstacle prediction can alter the target or controller state.
+        no_obstacles = np.zeros_like(masks["road"])
+        lane = plan_semantic_lane(masks["divider"], masks["road"], masks["forbidden"], no_obstacles,
                                   t["lookahead_ratio"], t["bottom_ratio"], t["roi_top_ratio"],
                                   t["min_mask_pixels"], t["vehicle_half_width"], divider_lane)
         if lane.valid:
@@ -103,11 +102,8 @@ class YoloSemanticPerception:
             self.last_target_x = lane.target_x
         else:
             self.last_target_x = None
-        boxes = raw_boxes if obstacle_confirmed else []
-        # Risk is measured against the divider corridor, not the temporary
-        # avoidance target.  Otherwise selecting an escape route hides the
-        # obstacle from the controller on the same frame.
-        risk = raw_risk if obstacle_confirmed else 0.0
+        boxes = []
+        risk = 0.0
         roi = masks["forbidden"][int(frame.shape[0] * t["roi_top_ratio"]):]
         mid = roi.shape[1] // 2
         forbidden_left = float(np.count_nonzero(roi[:, :mid])) / max(1, roi[:, :mid].size)
@@ -117,8 +113,7 @@ class YoloSemanticPerception:
         front_x2 = int(frame.shape[1] * float(t.get("front_roi_right_ratio", 0.70)))
         front = masks["forbidden"][front_y1:, front_x1:front_x2]
         forbidden_front = float(np.count_nonzero(front)) / max(1, front.size)
-        safe = ((masks["road"] > 0) & (masks["forbidden"] == 0) &
-                (masks["obstacle"] == 0))
+        safe = ((masks["road"] > 0) & (masks["forbidden"] == 0))
         low = safe[int(frame.shape[0] * t["lookahead_ratio"]):]
         left_clear = int(np.count_nonzero(low[:, :mid]))
         right_clear = int(np.count_nonzero(low[:, mid:]))
@@ -129,7 +124,7 @@ class YoloSemanticPerception:
             escape_steering = 1.0 if right_clear > left_clear else (-1.0 if left_clear > right_clear else 0.0)
         overlay = frame.copy()
         colours = {"road": (70, 160, 70), "divider": (0, 110, 255),
-                   "forbidden": (255, 80, 220), "obstacle": (0, 0, 255)}
+                   "forbidden": (255, 80, 220)}
         for name, colour in colours.items():
             overlay[masks[name] > 0] = colour
         annotated = cv2.addWeighted(frame, 0.60, overlay, 0.40, 0)

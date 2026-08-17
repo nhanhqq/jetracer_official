@@ -4,17 +4,19 @@ camera:
   capture_fps: 60
 
 models:
-  semantic: artifacts/track_yolo26n_sem_cube_nano_fp16.engine
+  # Best lane model engine. The cube engine belongs to the removed obstacle
+  # branch and must not be selected by the lane-following runtime.
+  semantic: artifacts/track_yolo26n_sem_nano_fp16.engine
   imgsz: 224
   confidence: 0.35
   device: "0"
+  lane_only: true
 
 semantic_classes:
   background: 0
   road: 1
   divider: 2
   forbidden: 3
-  obstacle: 4
 
 tracking:
   target_mode: divider       # keep camera centre on the physical divider
@@ -31,7 +33,6 @@ tracking:
   front_roi_top_ratio: 0.62
   front_roi_left_ratio: 0.30
   front_roi_right_ratio: 0.70
-  obstacle_confirm_frames: 2
 
 control:
   steering_gain: -0.65       # hardware calibration, inherited from notebook3
@@ -70,12 +71,6 @@ control:
   recovery_throttle: 1.00    # 100% throttle on recovery
   lane_reacquire_steering: 1.00 
   lane_reacquire_throttle: 1.00 # 100% throttle on reacquire
-  obstacle_avoid_time: 0.10  # Fast avoidance execution
-  obstacle_avoid_max_time: 0.50
-  obstacle_avoid_throttle: 1.00 # 100% throttle during avoidance
-  obstacle_avoid_steering: 1.00 
-  obstacle_preempt_steering_step: 1.00
-  obstacle_avoid_steering_limit: 1.00
   avoid_retry_time: 0.00
   avoid_hold_time: 0.00
   white_correct_time: 0.00

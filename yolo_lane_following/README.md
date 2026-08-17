@@ -1,6 +1,6 @@
 # YOLO26 Semantic Lane Following cho JetRacer
 
-Pipeline chính dùng `yolo26n-sem` (semantic segmentation), không dùng YOLO instance segmentation cũ. Mỗi pixel được phân loại thành `background`, `road`, `divider`, `forbidden` hoặc `obstacle`. Target mặc định là divider cam. Xe chỉ rời divider khi mask obstacle cắt corridor của xe; corridor mới phải nằm trong road và không đè lên `forbidden` (phần trắng). Khi obstacle không còn cắt corridor, target trở về divider ngay. Nếu obstacle che kín corridor nhưng vẫn có road hint, controller tiến chậm về phía rộng hơn; mất lane mà không có road hint thì dừng.
+Pipeline chính dùng `yolo26n-sem` (semantic segmentation), không dùng YOLO instance segmentation cũ. Runtime lane-following hiện dùng best model engine `artifacts/track_yolo26n_sem_nano_fp16.engine` và chỉ dùng các mask `road`, `divider`, `forbidden`; nhánh vật cản/cube đã tắt. Target mặc định là divider cam, còn vùng `forbidden` (phần trắng) vẫn là vùng không được đi vào. Mất lane quá ngưỡng thì dừng.
 
 ## Train Semantic
 

@@ -63,6 +63,7 @@ def main() -> None:
         max_lost_frames=cfg["tracking"]["max_lost_frames"],
         lane_lock_confirm_frames=cfg["tracking"].get("lane_lock_confirm_frames", 1),
         lane_lock_min_confidence=cfg["tracking"].get("lane_lock_min_confidence", 0.0),
+        lane_only=cfg["models"].get("lane_only", True),
     )
     controller = AdaptiveController(controller_cfg)
 
@@ -98,7 +99,7 @@ def main() -> None:
     frame_count = 0
     with log_path.open("w", newline="", encoding="utf-8") as stream:
         writer = csv.writer(stream)
-        writer.writerow(["time", "fps", "latency_ms", "lane_conf", "target_x", "risk", "steering", "throttle", "state"])
+        writer.writerow(["time", "fps", "latency_ms", "lane_conf", "target_x", "steering", "throttle", "state"])
         try:
             while not stopping:
                 if camera is not None:
@@ -119,7 +120,7 @@ def main() -> None:
                 result = perception.infer(frame)
                 now = time.perf_counter()
                 dt, last = now - last, now
-                command = controller.update(result.lane, result.obstacle_risk, frame.shape[1], dt,
+                command = controller.update(result.lane, 0.0, frame.shape[1], dt,
                                             result.forbidden_left, result.forbidden_right,
                                             result.escape_steering, result.forbidden_front)
                 output.set(command.steering, command.throttle)
@@ -145,7 +146,7 @@ def main() -> None:
                     fps_samples.append(1.0 / max(dt, 1e-6))
                     latency_samples.append(elapsed * 1000)
                 rows.append([time.time(), 1.0 / max(dt, 1e-6), elapsed * 1000,
-                             result.lane.confidence, result.lane.target_x, result.obstacle_risk,
+                             result.lane.confidence, result.lane.target_x,
                              command.steering, command.throttle, command.state])
                 if len(rows) >= int(cfg["runtime"]["log_every"]):
                     writer.writerows(rows); stream.flush(); rows.clear()
