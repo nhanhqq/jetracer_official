@@ -1,0 +1,57 @@
+\begin{thebibliography}{10}
+
+\bibitem{ref1}
+M.~O'Kelly, H.~Zheng, D.~Karthik, and R.~Mangharam, ``F1tenth: An open-source
+  evaluation environment for continuous control and reinforcement learning,''
+  {\em Proceedings of Machine Learning Research}, vol.~123, 2020.
+
+\bibitem{ref2}
+I.~Charles, H.~Maghsoumi, and Y.~Fallah, ``Advancing autonomous racing: A
+  comprehensive survey of the roboracer (f1tenth) platform,'' in {\em 2025 6th
+  International Conference on Artificial Intelligence, Robotics and Control
+  (AIRC)}, pp.~207--213, IEEE, 2025.
+
+\bibitem{ref3}
+S.~Daftry, S.~Zeng, J.~A. Bagnell, and M.~Hebert, ``Introspective perception:
+  Learning to predict failures in vision systems,'' in {\em 2016 IEEE/RSJ
+  international conference on intelligent robots and systems (IROS)},
+  pp.~1743--1750, IEEE, 2016.
+
+\bibitem{ref4}
+J.~K. Suhr and H.~G. Jung, ``Sensor fusion-based vacant parking slot detection
+  and tracking,'' {\em IEEE transactions on intelligent transportation
+  systems}, vol.~15, no.~1, pp.~21--36, 2013.
+
+\bibitem{ref5}
+J.~Redmon, S.~Divvala, R.~Girshick, and A.~Farhadi, ``You only look once:
+  Unified, real-time object detection,'' 2016.
+
+\bibitem{ref6}
+E.~Yurtsever, J.~Lambert, A.~Carballo, and K.~Takeda, ``A survey of autonomous
+  driving: Common practices and emerging technologies,'' {\em IEEE access},
+  vol.~8, pp.~58443--58469, 2020.
+
+\bibitem{ref7}
+W.~Li, M.~Liao, G.~Hua, Y.~Zhang, and W.~Zou, ``Contextual guidance network for
+  real-time semantic segmentation of autonomous driving,'' {\em IEEE
+  Transactions on Intelligent Transportation Systems}, vol.~26, no.~10,
+  pp.~16188--16203, 2025.
+
+\bibitem{ref8}
+J.~Zhao, Y.~Wu, R.~Deng, S.~Xu, J.~Gao, and A.~Burke, ``A survey of autonomous
+  driving from a deep learning perspective,'' {\em ACM Computing Surveys},
+  vol.~57, no.~10, pp.~1--60, 2025.
+
+\bibitem{ref9}
+M.~Ganesan, B.~Chokkalingam, S.~Kandhasamy, R.~Verma, and L.~Mihet-Popa,
+  ``Bridging the sim-to-real gap in motion planning for autonomous electric
+  vehicles using autoware: A comparative study of simulation and real-world
+  deployment,'' {\em IEEE Access}, vol.~13, pp.~136210--136225, 2025.
+
+\bibitem{ref10}
+M.~V.~L. De~Carvalho, R.~Simoni, L.~R. Yoshioka, J.~F. Justo, and B.~M.~K.
+  Kawakami, ``A performance evaluation of open source autonomous driving
+  frameworks: Case studies of apollo and autoware,'' {\em IEEE Access},
+  vol.~13, pp.~44294--44316, 2025.
+
+\end{thebibliography}
