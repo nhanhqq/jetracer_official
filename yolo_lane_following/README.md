@@ -2,6 +2,13 @@
 
 Pipeline chính dùng `yolo26n-sem` (semantic segmentation), không dùng YOLO instance segmentation cũ. Runtime lane-following hiện dùng best model engine `artifacts/track_yolo26n_sem_nano_fp16.engine` và chỉ dùng các mask `road`, `divider`, `forbidden`; nhánh vật cản/cube đã tắt. Target mặc định là divider cam, còn vùng `forbidden` (phần trắng) vẫn là vùng không được đi vào. Mất lane quá ngưỡng thì dừng.
 
+Trên JetPack 4, file `.engine` được Ultralytics load qua TensorRT. Vì engine
+phụ thuộc GPU/CUDA/cuBLAS/cuDNN/TensorRT, không dùng engine copy từ xe khác:
+hãy build và benchmark ngay trong container trên đúng Jetson đích. Script build
+không bật CUDA Graph mặc định vì một số tổ hợp driver/container có thể treo ở
+bước tạo execution context; chỉ bật lại sau khi đường inference thường đã pass
+bằng `USE_CUDA_GRAPH=1`.
+
 ## Train Semantic
 
 ```bash

@@ -131,7 +131,8 @@ class ControlTests(unittest.TestCase):
         curve = LaneEstimate(True, 145, 120, 0.25, 0.35, 1.0, "divider")
         curve_cmd = curve_ctl.update(curve, 0.0, 224, 0.05)
         self.assertAlmostEqual(straight_cmd.throttle, 0.32)
-        self.assertEqual(curve_cmd.throttle, straight_cmd.throttle)
+        # High-speed control must retain a speed margin in a sharp curve.
+        self.assertLess(curve_cmd.throttle, straight_cmd.throttle)
 
     def test_filtered_steering_reversal_does_not_snap(self):
         cfg = dict(CFG, steering_target_alpha=0.60, max_steering_step=0.16)

@@ -1,7 +1,5 @@
 #!/usr/bin/env python3
 """Run repeated still-frame perception/controller smoke tests without motors."""
-from __future__ import annotations
-
 import argparse
 import sys
 from pathlib import Path

@@ -1,7 +1,5 @@
-from __future__ import annotations
-
 from dataclasses import dataclass
-from typing import Optional, Sequence
+from typing import List, Optional, Sequence
 
 import cv2
 import numpy as np
@@ -128,7 +126,7 @@ def obstacle_risk(boxes: Sequence[Sequence[float]], width: int, height: int, pat
     return best
 
 
-def _row_candidates(safe: np.ndarray, y: int, half_width: int) -> list[float]:
+def _row_candidates(safe: np.ndarray, y: int, half_width: int) -> List[float]:
     """Return centres that have a complete vehicle-width support in one row."""
     row = safe[y] > 0
     candidates = []

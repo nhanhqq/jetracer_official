@@ -42,6 +42,8 @@ class AdaptiveController:
         self.lost_frames = 0
         self.has_lane_lock = False
         self.lane_lock_frames = 0
+        self.steering_reversal_frames = 0
+        self.steering_direction = 0
 
     def set_throttle_limit(self, requested: float) -> float:
         """Apply a live speed cap without allowing fixed manoeuvre speeds past it."""
@@ -232,11 +234,10 @@ class AdaptiveController:
                 steer = self._approach(self.last_steering,
                                        self.maneuver_steering * maneuver_gain,
                                        maneuver_step, maneuver_step)
-                # throttle = float(c.get(
-                #     "obstacle_avoid_throttle" if self.maneuver == "obstacle_avoid" else "recovery_throttle",
-                #     c["throttle_min"],
-                # ))
-                throttle = c["throttle_max"]
+                throttle_key = ("obstacle_avoid_throttle"
+                                if self.maneuver == "obstacle_avoid"
+                                else "recovery_throttle")
+                throttle = float(c.get(throttle_key, c["throttle_min"]))
                 throttle = self._approach(
                     self.last_throttle, throttle,
                     float(c.get("maneuver_throttle_step_up", c["throttle_step_up"])),
@@ -269,7 +270,7 @@ class AdaptiveController:
                     c.get("maneuver_steering_step", c["max_steering_step"]),
                     c.get("maneuver_steering_step", c["max_steering_step"]),
                 )
-                self.last_throttle = c["throttle_max"]
+                self.last_throttle = float(c.get("lane_reacquire_throttle", c["throttle_min"]))
                 return ControlCommand(self.last_steering, self.last_throttle, "reacquire:road")
             self.last_throttle = 0.0
             self.last_steering = self._approach(self.last_steering, 0.0, c["max_steering_step"], c["max_steering_step"])
@@ -299,25 +300,50 @@ class AdaptiveController:
         # jitter can otherwise alternate the wheel direction at inference FPS.
         alpha = float(np.clip(c.get("steering_target_alpha", 1.0), 0.0, 1.0))
         filtered_raw = alpha * raw + (1.0 - alpha) * self.last_raw_steering
+        # A single noisy segmentation frame must not immediately command the
+        # opposite lock.  Keep the previous direction until the new direction
+        # is persistent (or clearly large), which prevents left/right chatter.
+        deadband = float(c.get("steering_direction_deadband", 0.08))
+        direction = int(np.sign(filtered_raw)) if abs(filtered_raw) >= deadband else 0
+        if self.steering_direction and direction and direction != self.steering_direction:
+            self.steering_reversal_frames += 1
+            required = int(c.get("steering_reversal_confirm_frames", 3))
+            strong = abs(filtered_raw) >= float(c.get("steering_reversal_force", 0.55))
+            if self.steering_reversal_frames < required and not strong:
+                filtered_raw = float(np.sign(self.steering_direction) *
+                                     min(abs(filtered_raw), abs(self.last_raw_steering)))
+            else:
+                self.steering_direction = direction
+                self.steering_reversal_frames = 0
+        elif direction:
+            self.steering_direction = direction
+            self.steering_reversal_frames = 0
         steering = self._approach(self.last_steering, filtered_raw,
                                   c["max_steering_step"], c["max_steering_step"])
 
         # Slow down from the requested turn, before the smoothed wheel command
         # has fully caught up. This preserves smooth steering without entering
         # a corner at straight-line speed.
-        # curve_load = max(abs(raw), abs(lane.heading_error), lane.curvature)
-        # speed_scale = max(0.28, 1.0 - c["curve_slowdown"] * curve_load)
-        # confidence_scale = c["low_confidence_slowdown"] + (1.0 - c["low_confidence_slowdown"]) * lane.confidence
-        # obstacle_scale = max(0.25, 1.0 - obstacle) if obstacle >= c["obstacle_slow_ratio"] else 1.0
-        # if lane.source == "avoid":
-        #     obstacle_scale = min(obstacle_scale, c["avoidance_speed_scale"])
-        # boost_start = float(c.get("straight_boost_start", 0.06))
-        # boost_end = max(boost_start + 1e-6, float(c.get("straight_boost_end", 0.22)))
-        # straightness = float(np.clip((boost_end - curve_load) / (boost_end - boost_start), 0.0, 1.0))
-        # speed_base = c["throttle_cruise"] + straightness * (c["throttle_max"] - c["throttle_cruise"])
-        # target_throttle = float(np.clip(speed_base * speed_scale * confidence_scale * obstacle_scale,
-        #                                 c["throttle_min"], c["throttle_max"]))
-        target_throttle = c["throttle_max"]
+        curve_load = max(abs(raw), abs(lane.heading_error), abs(lane.curvature))
+        speed_scale = max(0.28, 1.0 - c["curve_slowdown"] * curve_load)
+        confidence_scale = c["low_confidence_slowdown"] + (1.0 - c["low_confidence_slowdown"]) * lane.confidence
+        obstacle_scale = max(0.25, 1.0 - obstacle) if obstacle >= c["obstacle_slow_ratio"] else 1.0
+        if lane.source == "avoid":
+            obstacle_scale = min(obstacle_scale, c["avoidance_speed_scale"])
+        boost_start = float(c.get("straight_boost_start", 0.06))
+        boost_end = max(boost_start + 1e-6, float(c.get("straight_boost_end", 0.22)))
+        straightness = float(np.clip((boost_end - curve_load) / (boost_end - boost_start), 0.0, 1.0))
+        speed_base = c["throttle_cruise"] + straightness * (c["throttle_max"] - c["throttle_cruise"])
+        target_throttle = float(np.clip(speed_base * speed_scale * confidence_scale * obstacle_scale,
+                                        c["throttle_min"], c["throttle_max"]))
+        # Preserve maximum straight-line speed, but unload the chassis during
+        # asymmetric right turns.  The right-side linkage produces more wheel
+        # angle than the left, so full throttle there can make the car tip.
+        if steering > 0.0:
+            right_limit = max(1e-6, float(c.get("max_steering_right", c["max_steering"])))
+            right_scale = float(c.get("right_turn_throttle_scale", 1.0))
+            turn_fraction = float(np.clip(steering / right_limit, 0.0, 1.0))
+            target_throttle *= 1.0 - (1.0 - right_scale) * turn_fraction
         throttle = self._approach(self.last_throttle, target_throttle, c["throttle_step_up"], c["throttle_step_down"])
         self.last_error, self.last_raw_steering = error, filtered_raw
         self.last_steering, self.last_throttle = steering, throttle

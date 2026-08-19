@@ -20,10 +20,11 @@ semantic_classes:
 
 tracking:
   target_mode: divider       # keep camera centre on the physical divider
-  lookahead_ratio: 0.60
+  lookahead_ratio: 0.66   # compensate control latency at high speed
   bottom_ratio: 0.93
   roi_top_ratio: 0.45
   min_mask_pixels: 35
+  max_target_jump: 48.0  # reject spikes without delaying genuine sharp turns
   confidence_ema: 0.35
   max_lost_frames: 3
   lane_lock_confirm_frames: 3
@@ -37,40 +38,50 @@ tracking:
 control:
   steering_gain: -0.65       # hardware calibration, inherited from notebook3
   steering_offset: 0.0
+  # Mechanical steering calibration. Positive is right in run.py; this car
+  # turns the left wheel too far on right commands, so limit that side first.
+  steering_left_scale: 1.00
+  steering_right_scale: 0.68
+  max_steering_left: 1.00
+  max_steering_right: 0.68
+  right_turn_throttle_scale: 0.70  # Keep full speed on straights; unload right turns
   throttle_gain: 1.0         # 100% full motor power output
-  kp: 0.92
-  ki: 0.02
-  kd: 0.10
-  heading_gain: 0.42
+  kp: 0.80
+  ki: 0.01
+  kd: 0.14
+  heading_gain: 0.38
   max_steering: 1.00         # Maximum steering lock (100% full wheel turn)
   # Steering rate limit set to rapid response
-  max_steering_step: 0.45    # Very fast steering response to track at high speed
-  maneuver_steering_step: 0.50
+  max_steering_step: 0.10    # Smooth wheel slew; avoids snap/oscillation
+  maneuver_steering_step: 0.14
   maneuver_throttle_step_up: 0.25      # 25% maneuver acceleration step
   maneuver_throttle_step_down: 0.35    # 35% maneuver deceleration step
-  steering_target_alpha: 0.85 # Quick steering update with minimal smoothing
-  throttle_min: 0.40         # High floor speed to carry momentum in sharp corners (was 0.09)
-  throttle_cruise: 0.85      # High cruise speed (was 0.23)
+  steering_target_alpha: 0.45 # Filter segmentation jitter before steering
+  steering_direction_deadband: 0.08
+  steering_reversal_confirm_frames: 3
+  steering_reversal_force: 0.55
+  throttle_min: 0.25
+  throttle_cruise: 0.65
   throttle_max: 1.00         # Maximum hardware throttle (100%)
   throttle_limit_min: 0.10
   throttle_limit_max: 1.00
   throttle_step_up: 0.25     # 25% throttle acceleration step per frame
   throttle_step_down: 0.35   # 35% throttle deceleration step per frame
-  curve_slowdown: 0.15       # Minimal slowdown on curves (was 0.62) to maintain high cornering speed
+  curve_slowdown: 0.50       # Reduce speed proportionally to steering demand
   straight_boost_start: 0.35 # Boosts to 1.00 even on moderate curves (was 0.06)
   straight_boost_end: 0.55   # End boost only on very sharp curves (was 0.22)
-  low_confidence_slowdown: 1.00 # No slowdown even if confidence drops
+  low_confidence_slowdown: 0.55
   emergency_obstacle_ratio: 1.00
-  obstacle_slow_ratio: 1.00  # Never slow down for obstacles (was 0.75)
-  avoidance_speed_scale: 1.00 # Maintain 100% speed during obstacle avoidance
+  obstacle_slow_ratio: 0.75
+  avoidance_speed_scale: 0.80
   # ESC needs a neutral command before changing from forward to reverse.
-  reverse_neutral_time: 0.00 # Instant reverse transition
+  reverse_neutral_time: 0.10
   reverse_time: 0.10         # Extremely fast reverse duration
-  reverse_throttle: 1.00     # 100% full throttle reverse
+  reverse_throttle: 0.35
   recovery_steering: 1.00    
-  recovery_throttle: 1.00    # 100% throttle on recovery
+  recovery_throttle: 0.35
   lane_reacquire_steering: 1.00 
-  lane_reacquire_throttle: 1.00 # 100% throttle on reacquire
+  lane_reacquire_throttle: 0.40
   avoid_retry_time: 0.00
   avoid_hold_time: 0.00
   white_correct_time: 0.00

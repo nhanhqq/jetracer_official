@@ -1,8 +1,6 @@
-from __future__ import annotations
-
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, List
+from typing import Dict, List, Tuple
 
 import cv2
 import numpy as np
@@ -45,12 +43,13 @@ class YoloSemanticPerception:
     """
 
     def __init__(self, cfg: dict):
-        from ultralytics import YOLO
-
         model_cfg = cfg["models"]
         model_path = resolve_path(cfg, model_cfg["semantic"])
         if not model_path.exists():
             raise FileNotFoundError(f"Missing semantic model: {model_path}. Run train_semantic.py first.")
+
+        from ultralytics import YOLO
+
         self.model = YOLO(str(model_path), task="semantic")
         self.cfg = cfg
         self.imgsz = int(model_cfg["imgsz"])
@@ -66,7 +65,7 @@ class YoloSemanticPerception:
         blank = np.zeros((height, width, 3), dtype=np.uint8)
         self.model.predict(blank, imgsz=self.imgsz, device=self.device, verbose=False)
 
-    def _masks(self, result, shape: tuple[int, int]) -> Dict[str, np.ndarray]:
+    def _masks(self, result, shape: Tuple[int, int]) -> Dict[str, np.ndarray]:
         height, width = shape
         labels = result.semantic_mask.data.detach().cpu().numpy().astype(np.uint8)
         if labels.shape != (height, width):
@@ -98,7 +97,13 @@ class YoloSemanticPerception:
                                   t["min_mask_pixels"], t["vehicle_half_width"], divider_lane)
         if lane.valid:
             if self.last_target_x is not None:
-                lane.target_x = float(np.clip(lane.target_x, self.last_target_x - 28, self.last_target_x + 28))
+                # Reject isolated segmentation jumps, but allow a real sharp
+                # turn to enter the controller promptly (the old fixed 28px
+                # clamp made the car react late at high speed).
+                jump = float(t.get("max_target_jump", 48.0))
+                lane.target_x = float(np.clip(lane.target_x,
+                                              self.last_target_x - jump,
+                                              self.last_target_x + jump))
             self.last_target_x = lane.target_x
         else:
             self.last_target_x = None

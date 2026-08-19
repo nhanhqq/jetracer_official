@@ -20,7 +20,10 @@ from yolo_lane_following.semantic_perception import YoloSemanticPerception
 
 class CarOutput:
     def __init__(self, cfg: dict, dry_run: bool):
+        self.cfg = cfg
         self.dry_run = dry_run
+        self.last_effective_steering = 0.0
+        self.last_effective_throttle = 0.0
         self.car = None
         if not dry_run:
             from notebook3.basic_motion import JetRacerController
@@ -29,8 +32,21 @@ class CarOutput:
                                           c["throttle_gain"], c["throttle_max"])
 
     def set(self, steering: float, throttle: float) -> None:
+        effective_steering = float(steering)
+        if effective_steering >= 0.0:
+            effective_steering *= float(self.cfg["control"].get("steering_right_scale", 1.0))
+            effective_steering = min(effective_steering, float(self.cfg["control"].get("max_steering_right", 1.0)))
+        else:
+            effective_steering *= float(self.cfg["control"].get("steering_left_scale", 1.0))
+            effective_steering = max(effective_steering, -float(self.cfg["control"].get("max_steering_left", 1.0)))
+        self.last_effective_steering = effective_steering
+        self.last_effective_throttle = float(throttle)
         if self.car:
-            self.car.set_steering(steering)
+            # The steering linkage is asymmetric: on this chassis a positive
+            # (right) command produces more wheel angle than a negative one.
+            # Calibrate the two sides independently to avoid rollover in
+            # right-hand turns while retaining the left turn response.
+            self.car.set_steering(effective_steering)
             self.car.set_throttle(throttle)
 
     def stop(self) -> None:
@@ -79,6 +95,8 @@ def main() -> None:
         capture = cv2.VideoCapture(source)
         if not capture.isOpened():
             raise RuntimeError(f"Cannot open source: {args.source}")
+        # Do not let a slow inference loop accumulate stale frames.
+        capture.set(cv2.CAP_PROP_BUFFERSIZE, 1)
 
     log_dir = resolve_path(cfg, cfg["runtime"]["log_dir"])
     log_dir.mkdir(parents=True, exist_ok=True)
@@ -99,13 +117,21 @@ def main() -> None:
     frame_count = 0
     with log_path.open("w", newline="", encoding="utf-8") as stream:
         writer = csv.writer(stream)
-        writer.writerow(["time", "fps", "latency_ms", "lane_conf", "target_x", "steering", "throttle", "state"])
+        writer.writerow(["time", "fps", "latency_ms", "lane_conf", "target_x",
+                         "steering", "effective_steering", "throttle", "state"])
         try:
             while not stopping:
                 if camera is not None:
-                    frame = camera.value
+                    latest = camera.value
+                    # Snapshot immediately.  jetcam may reuse/update its
+                    # backing ndarray while TensorRT is still processing it.
+                    frame = latest.copy() if latest is not None else None
                     ok = frame is not None
                 else:
+                    # CAP_PROP_BUFFERSIZE is not honoured by every backend;
+                    # discard any frames already queued before retrieving the
+                    # one that will be used for control.
+                    capture.grab()
                     ok, frame = capture.read()
                 if not ok:
                     break
@@ -147,7 +173,8 @@ def main() -> None:
                     latency_samples.append(elapsed * 1000)
                 rows.append([time.time(), 1.0 / max(dt, 1e-6), elapsed * 1000,
                              result.lane.confidence, result.lane.target_x,
-                             command.steering, command.throttle, command.state])
+                             command.steering, output.last_effective_steering,
+                             command.throttle, command.state])
                 if len(rows) >= int(cfg["runtime"]["log_every"]):
                     writer.writerows(rows); stream.flush(); rows.clear()
                 if args.display:
