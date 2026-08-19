@@ -91,7 +91,7 @@ def main() -> None:
     args = parser.parse_args()
     exported = YOLO(str(args.model), task="semantic").export(
         format="onnx", imgsz=args.imgsz, batch=1, dynamic=False,
-        simplify=False, opset=13, device="cpu")
+        simplify=True, opset=13, device="cpu")
     output = Path(exported)
     model = onnx.load(str(output))
     split_replaced = replace_static_splits(model)
