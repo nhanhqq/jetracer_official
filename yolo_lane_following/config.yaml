@@ -26,7 +26,10 @@ tracking:
   bottom_ratio: 0.93
   roi_top_ratio: 0.45
   min_mask_pixels: 35
-  max_target_jump: 48.0  # reject spikes without delaying genuine sharp turns
+  max_target_jump: 22.0  # gate spikes; dashed-divider chaining handles real turns
+  path_alpha: 0.60
+  path_beta: 0.10
+  path_prediction_time: 0.035  # compensate a small portion of inference latency
   confidence_ema: 0.35
   max_lost_frames: 3
   vehicle_half_width: 13
@@ -42,32 +45,37 @@ control:
   steering_offset: 0.0
   steering_left_scale: 1.00
   steering_right_scale: 0.68
-  max_steering_left: 1.00
-  max_steering_right: 0.68
+  max_steering_left: 0.90
+  max_steering_right: 0.62
 
-  kp: 0.72
-  ki: 0.01
-  kd: 0.06
-  derivative_alpha: 0.25
+  kp: 0.56
+  ki: 0.00
+  kd: 0.035
+  derivative_alpha: 0.20
 
-  heading_gain: 0.34
+  heading_gain: 0.30
 
   max_steering: 1.00
+  # All live slew/reversal values are wall-clock based, so a Nano FPS dip does
+  # not silently make the vehicle slower to react or change its damping.
+  steering_rate: 1.60
+  steering_maneuver_rate: 2.20
   max_steering_step: 0.08
   maneuver_steering_step: 0.10
-  steering_target_alpha: 0.36
-  steering_direction_deadband: 0.10
-  # Three persistent frames distinguish a real S-bend reversal from one noisy
-  # frame, without delaying the second half of the S.
-  steering_reversal_confirm_frames: 3
-  steering_reversal_force: 0.65
+  steering_target_alpha: 0.30
+  steering_direction_deadband: 0.08
+  steering_reversal_confirm_time: 0.06
+  steering_reversal_force: 0.60
 
   throttle_gain: 1.0
 
   # Keep enough motor torque to avoid cogging/stall, while leaving a real gap
   # below straight-line maximum speed.
-  throttle_min: 0.44
-  throttle_cruise: 0.78
+  throttle_min: 0.44  # legacy/fixed manoeuvre fallback; not a corner speed floor
+  throttle_motion_min: 0.44
+  # Requested for vehicle test: allow the straight-line scheduler to reach the
+  # hardware-normalised maximum. Curve/corner and right-turn limits remain.
+  throttle_cruise: 1.00
   throttle_max: 1.00
   # Maximum speed is only reached on a stable straight. Never bypass the
   # curve/confidence/right-turn safety scheduler.
@@ -78,6 +86,8 @@ control:
 
   throttle_step_up: 0.045
   throttle_step_down: 0.045
+  throttle_accel_rate: 0.60
+  throttle_brake_rate: 1.50
 
   maneuver_throttle_step_up: 0.10
   maneuver_throttle_step_down: 0.050
@@ -88,6 +98,10 @@ control:
   throttle_target_accel_alpha: 0.18
 
   curve_slowdown: 0.58
+  curve_curve_load: 0.40
+  corner_curve_load: 0.62
+  curve_throttle: 0.48
+  corner_throttle: 0.00
   curve_load_attack_alpha: 0.80
   curve_load_release_alpha: 0.15
 

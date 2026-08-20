@@ -31,6 +31,18 @@ class GeometryTests(unittest.TestCase):
         self.assertTrue(lane.valid)
         self.assertAlmostEqual(lane.target_x, 111.5, delta=1.0)
 
+    def test_dashed_divider_is_fit_as_one_continuous_path(self):
+        divider = np.zeros((224, 224), np.uint8)
+        # One dashed, gently curving marking plus a tempting unrelated blob.
+        for y in range(102, 220, 16):
+            x = int(112 + (220 - y) * 0.18)
+            divider[y:y + 8, x - 2:x + 3] = 255
+        divider[155:190, 35:42] = 255
+        lane = estimate_lane(divider, np.zeros_like(divider))
+        self.assertTrue(lane.valid)
+        self.assertGreater(lane.target_x, 120)
+        self.assertLess(lane.target_x, 140)
+
     def test_strict_divider_mode_does_not_invent_lane_from_road(self):
         road = np.zeros((224, 224), np.uint8); road[100:, 30:190] = 255
         self.assertFalse(estimate_lane(np.zeros_like(road), road, target_mode="divider").valid)
@@ -142,6 +154,15 @@ class ControlTests(unittest.TestCase):
         first = ctl.update(right, 0.0, 224, 0.05)
         second = ctl.update(left, 0.0, 224, 0.05)
         self.assertLessEqual(abs(second.steering - first.steering), 0.16 + 1e-9)
+
+    def test_time_based_steering_slew_is_fps_independent(self):
+        cfg = dict(CFG, steering_rate=1.6, steering_target_alpha=1.0, kd=0.0)
+        lane = LaneEstimate(True, 200, 160, 0.3, 0.1, 1.0, "divider")
+        slow = AdaptiveController(dict(cfg)).update(lane, 0.0, 224, 0.10)
+        fast_ctl = AdaptiveController(dict(cfg))
+        fast_ctl.update(lane, 0.0, 224, 0.05)
+        fast = fast_ctl.update(lane, 0.0, 224, 0.05)
+        self.assertAlmostEqual(slow.steering, fast.steering, places=6)
 
     def test_close_obstacle_drives_forward_then_returns_to_divider(self):
         ctl = AdaptiveController(CFG)

@@ -1,0 +1,58 @@
+# Separate from config.yaml: Smart City starts dry-run and cannot turn until
+# BEV homography is calibrated with tools/calibrate_bev.py.
+camera: {width: 224, height: 224, capture_fps: 60}
+models:
+  semantic: artifacts/track_yolo26n_sem_nano_fp16.engine
+  imgsz: 224
+  device: "0"
+  lane_only: true
+semantic_classes: {background: 0, road: 1, divider: 2, forbidden: 3}
+tracking: {target_mode: road, lookahead_ratio: .62, bottom_ratio: .93, roi_top_ratio: .45, min_mask_pixels: 35, max_target_jump: 22, path_alpha: .60, path_beta: .10, path_prediction_time: .035, max_lost_frames: 3, road_hint_min_ratio: .005, front_roi_top_ratio: .62, front_roi_left_ratio: .30, front_roi_right_ratio: .70}
+control:
+  steering_gain: -.65
+  steering_offset: 0
+  steering_left_scale: 1.0
+  steering_right_scale: .68
+  max_steering_left: .90
+  max_steering_right: .62
+  kp: .56
+  ki: 0
+  kd: .035
+  heading_gain: .30
+  max_steering: 1.0
+  steering_rate: 1.60
+  steering_maneuver_rate: 2.20
+  max_steering_step: .08
+  maneuver_steering_step: .10
+  throttle_min: .20
+  throttle_cruise: .38
+  throttle_max: .38
+  throttle_step_up: .045
+  throttle_step_down: .045
+  throttle_accel_rate: .60
+  throttle_brake_rate: 1.50
+  curve_slowdown: .58
+  curve_throttle: .30
+  corner_throttle: .20
+  low_confidence_slowdown: .58
+  confidence_full_speed: .75
+  throttle_limit_min: .0
+  throttle_limit_max: .38
+  lane_only: true
+smart_city:
+  crosswalk: {roi_top: .45, roi_bottom: .95, min_bars: 4, confirm_frames: 3, history_frames: 5, approach_y: .55, decision_y: .70}
+  traffic_light: {roi_top: .05, roi_bottom: .70, min_blob_ratio: .00002, max_blob_ratio: .008, max_blob_aspect: 2.2, score_min: .12, history_frames: 5, confirm_frames: 3}
+  signs: {model: null, imgsz: 320, roi_bottom: .65, infer_stride: 3, confidence: .55, vote_window: 7, vote_min: 4}
+  intersection:
+    # null is intentionally fail-safe. Calibrate before any armed test.
+    homography: null
+    bev_width: 224
+    bev_height: 224
+    branch_min_score: .18
+    preferred_order: [straight, right, left]
+  speed: {cruise: .38, approach: .30, decision: .20, left: .24, right: .22, straight: .28, reacquire: .30}
+  exit: {lane_confidence: .55, lane_reacquire_frames: 5, crosswalk_clear_frames: 10}
+  turn_steering: {left: -.55, right: .45, straight: 0.0}
+  # Keep zero until a slow, physically supervised timed-turn calibration.
+  turn_duration_s: {left: 0.0, right: 0.0, straight: 0.0}
+runtime: {log_dir: logs, log_every: 10}

@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 from pathlib import Path
+import time
 from typing import Dict, List, Tuple
 
 import cv2
@@ -57,6 +58,8 @@ class YoloSemanticPerception:
         self.class_ids = {str(name).lower(): int(class_id)
                           for name, class_id in cfg["semantic_classes"].items()}
         self.last_target_x = None
+        self.last_target_time = None
+        self.target_velocity = 0.0
 
     def warmup(self) -> None:
         """Initialize the lazy backend before camera callbacks or motor gating."""
@@ -86,9 +89,10 @@ class YoloSemanticPerception:
         result = self.model.predict(frame, imgsz=self.imgsz, device=self.device, verbose=False)[0]
         masks = self._masks(result, frame.shape[:2])
         t = self.cfg["tracking"]
+        target_mode = str(t.get("target_mode", "divider")).lower()
         divider_lane = estimate_lane(masks["divider"], masks["road"],
                                      t["lookahead_ratio"], t["bottom_ratio"],
-                                     t["roi_top_ratio"], t["min_mask_pixels"], "divider")
+                                     t["roi_top_ratio"], t["min_mask_pixels"], target_mode)
         if bool(self.cfg["models"].get("lane_only", False)):
             # This track has no obstacles: the segmented divider is the sole
             # driving reference.  Do not let a noisy road/forbidden boundary
@@ -101,18 +105,33 @@ class YoloSemanticPerception:
                 masks["divider"], masks["road"], masks["forbidden"], no_obstacles,
                 t["lookahead_ratio"], t["bottom_ratio"], t["roi_top_ratio"],
                 t["min_mask_pixels"], t["vehicle_half_width"], divider_lane)
-        if lane.valid:
-            if self.last_target_x is not None:
-                # Reject isolated segmentation jumps, but allow a real sharp
-                # turn to enter the controller promptly (the old fixed 28px
-                # clamp made the car react late at high speed).
-                jump = float(t.get("max_target_jump", 48.0))
-                lane.target_x = float(np.clip(lane.target_x,
-                                              self.last_target_x - jump,
-                                              self.last_target_x + jump))
+        if lane.valid and lane.source == "divider":
+            now = time.monotonic()
+            measurement = float(lane.target_x)
+            if self.last_target_x is not None and self.last_target_time is not None:
+                dt = float(np.clip(now - self.last_target_time, 1e-3, 0.20))
+                predicted = self.last_target_x + self.target_velocity * dt
+                # This is a gate, not a substitute for proper dashed-line
+                # extraction.  It rejects isolated semantic spikes before the
+                # alpha-beta update can turn them into steering motion.
+                jump = float(t.get("max_target_jump", 22.0))
+                measurement = float(np.clip(measurement, predicted - jump, predicted + jump))
+                innovation = measurement - predicted
+                alpha = float(np.clip(t.get("path_alpha", 0.60), 0.0, 1.0))
+                beta = float(np.clip(t.get("path_beta", 0.10), 0.0, 1.0))
+                filtered = predicted + alpha * innovation
+                self.target_velocity += beta * innovation / dt
+                lead = float(np.clip(t.get("path_prediction_time", 0.0), 0.0, 0.15))
+                target = filtered + self.target_velocity * lead
+                delta = float(np.clip(target, 0, frame.shape[1] - 1)) - lane.target_x
+                lane.target_x = float(np.clip(lane.target_x + delta, 0, frame.shape[1] - 1))
+                lane.near_x = float(np.clip(lane.near_x + delta, 0, frame.shape[1] - 1))
             self.last_target_x = lane.target_x
-        else:
+            self.last_target_time = now
+        elif not lane.valid:
             self.last_target_x = None
+            self.last_target_time = None
+            self.target_velocity = 0.0
         boxes = []
         risk = 0.0
         roi = masks["forbidden"][int(frame.shape[0] * t["roi_top_ratio"]):]

@@ -69,6 +69,58 @@ def _path_component(mask: np.ndarray) -> np.ndarray:
     return (labels == best_label).astype(np.uint8) if best_label else binary
 
 
+def _divider_chain(mask: np.ndarray, top_y: int, band_height: int = 8) -> np.ndarray:
+    """Join a dashed divider by tracking centroids through horizontal bands.
+
+    A physical dashed line is several disconnected components, so choosing one
+    connected component makes the fitted path jump as a dash enters/leaves the
+    ROI.  This small image-space tracker starts near the vehicle, then selects
+    the spatially continuous candidate in each band.  The returned polyline is
+    deliberately only a fitting aid; it never changes the semantic masks used
+    for forbidden/obstacle safety decisions.
+    """
+    binary = (mask > 0).astype(np.uint8)
+    h, w = binary.shape
+    candidates = []
+    for y0 in range(top_y, h, max(2, band_height)):
+        y1 = min(h, y0 + max(2, band_height))
+        count, _, stats, centres = cv2.connectedComponentsWithStats(binary[y0:y1], 8)
+        band = []
+        for label in range(1, count):
+            x, _y, bw, bh, area = stats[label]
+            if area >= 2 and bw <= max(4, int(w * 0.30)):
+                band.append(float(centres[label, 0]))
+        candidates.append((0.5 * (y0 + y1 - 1), band))
+
+    selected = []
+    predicted_x = w / 2.0
+    previous_dx = 0.0
+    # Work from near to far: the low image bands provide the most reliable
+    # vehicle-relative anchor, then continuity bridges missing dash bands.
+    for y, band in reversed(candidates):
+        if not band:
+            continue
+        expected = predicted_x + previous_dx
+        x = min(band, key=lambda value: abs(value - expected) +
+                0.35 * abs((value - predicted_x) - previous_dx))
+        if selected and abs(x - expected) > max(26.0, w * 0.22):
+            continue
+        if selected:
+            previous_dx = x - predicted_x
+        predicted_x = x
+        selected.append((int(round(y)), int(round(x))))
+
+    if len(selected) < 3:
+        return binary
+    chain = np.zeros_like(binary)
+    selected.sort()
+    for first, second in zip(selected, selected[1:]):
+        cv2.line(chain, (first[1], first[0]), (second[1], second[0]), 1, 3)
+    for y, x in selected:
+        cv2.circle(chain, (x, y), 2, 1, -1)
+    return chain
+
+
 def estimate_lane(
     divider_mask: np.ndarray,
     road_mask: np.ndarray,
@@ -84,8 +136,10 @@ def estimate_lane(
     h, w = divider_mask.shape
     top_y = int(h * roi_top_ratio)
     look_y, near_y = int(h * lookahead_ratio), int(h * bottom_ratio)
-    source, mask = "divider", _path_component(divider_mask)
-    coeff = _fit_x(mask, top_y, min_pixels)
+    source, mask = "divider", _divider_chain(divider_mask, top_y)
+    # Smart City roads often use orange edges rather than a centre divider.
+    # In explicit road mode, do not accidentally fit one of those edges.
+    coeff = None if target_mode == "road" else _fit_x(mask, top_y, min_pixels)
 
     if coeff is None and target_mode != "divider":
         # Fallback to the centre of the drivable component per image row.
