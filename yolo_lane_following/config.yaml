@@ -20,7 +20,9 @@ semantic_classes:
 
 tracking:
   target_mode: divider       # keep camera centre on the physical divider
-  lookahead_ratio: 0.8   # compensate control latency at high speed
+  # Look farther ahead for the straight -> 90-degree-left transition. This is
+  # still inside the stable fitted-divider ROI and gives time to brake/turn.
+  lookahead_ratio: 0.62
   bottom_ratio: 0.93
   roi_top_ratio: 0.45
   min_mask_pixels: 35
@@ -34,7 +36,8 @@ tracking:
   front_roi_right_ratio: 0.70
 
 control:
-  # GIỮ NGUYÊN steering/PID như cũ
+  # Conservative closed-loop steering: derivative and target filtering remove
+  # frame-to-frame zigzag while the slew limit prevents snap steering.
   steering_gain: -0.65
   steering_offset: 0.0
   steering_left_scale: 1.00
@@ -42,54 +45,60 @@ control:
   max_steering_left: 1.00
   max_steering_right: 0.68
 
-  kp: 0.76                    # 0.80 -> 0.76
+  kp: 0.72
   ki: 0.01
-  kd: 0.15                    # 0.14 -> 0.15
+  kd: 0.06
+  derivative_alpha: 0.25
 
-  heading_gain: 0.36
+  heading_gain: 0.34
 
   max_steering: 1.00
-  max_steering_step: 0.10
-  maneuver_steering_step: 0.14
-  steering_target_alpha: 0.45
-  steering_direction_deadband: 0.08
+  max_steering_step: 0.08
+  maneuver_steering_step: 0.10
+  steering_target_alpha: 0.36
+  steering_direction_deadband: 0.10
+  # Three persistent frames distinguish a real S-bend reversal from one noisy
+  # frame, without delaying the second half of the S.
   steering_reversal_confirm_frames: 3
-  steering_reversal_force: 0.55
+  steering_reversal_force: 0.65
 
-  # CHỈ CHỈNH NHẸ THROTTLE
   throttle_gain: 1.0
 
-  throttle_min: 0.25
-  throttle_cruise: 0.72      # tăng nhẹ tốc độ nền
+  # Keep enough motor torque to avoid cogging/stall, while leaving a real gap
+  # below straight-line maximum speed.
+  throttle_min: 0.44
+  throttle_cruise: 0.78
   throttle_max: 1.00
-  throttle_always_max: true
+  # Maximum speed is only reached on a stable straight. Never bypass the
+  # curve/confidence/right-turn safety scheduler.
+  throttle_always_max: false
 
-  throttle_limit_min: 0.10
+  throttle_limit_min: 0.20
   throttle_limit_max: 1.00
 
-  # cũ: 0.25 / 0.35
-  # giảm nhẹ để hết "drop" giật cục
-  throttle_step_up: 0.08
-  throttle_step_down: 0.020
+  throttle_step_up: 0.045
+  throttle_step_down: 0.045
 
   maneuver_throttle_step_up: 0.10
   maneuver_throttle_step_down: 0.050
 
   # Smooth the speed demand so one noisy segmentation/PID frame cannot unload
   # the motor and create a throttle drop/judder.
-  throttle_target_alpha: 0.25
+  throttle_target_brake_alpha: 0.60
+  throttle_target_accel_alpha: 0.18
 
-  # cũ 0.50 -> chỉ giảm nhẹ
-  curve_slowdown: 0.30
+  curve_slowdown: 0.58
+  curve_load_attack_alpha: 0.80
+  curve_load_release_alpha: 0.15
 
-  # cũ 0.70 -> tránh hụt ga mạnh khi cua phải
-  right_turn_throttle_scale: 0.88
+  right_turn_throttle_scale: 0.70
 
-  # GIỮ vùng boost gần config cũ để behavior không đổi nhiều
-  straight_boost_start: 0.35
-  straight_boost_end: 0.55
+  straight_boost_start: 0.10
+  straight_boost_end: 0.34
 
-  low_confidence_slowdown: 0.65
+  low_confidence_slowdown: 0.58
+  confidence_full_speed: 0.75
+  lane_dropout_throttle_scale: 0.65
 
   emergency_obstacle_ratio: 1.00
   obstacle_slow_ratio: 0.75
@@ -99,10 +108,10 @@ control:
   reverse_time: 0.10
   reverse_throttle: 0.35
 
-  recovery_steering: 1.00
-  recovery_throttle: 0.35
+  recovery_steering: 0.65
+  recovery_throttle: 0.42
 
-  lane_reacquire_steering: 1.00
+  lane_reacquire_steering: 0.60
   lane_reacquire_throttle: 0.40
 
   avoid_retry_time: 0.00

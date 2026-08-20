@@ -345,15 +345,39 @@ class ControlTests(unittest.TestCase):
             self.assertEqual(cmd.state, "stop:lane_lost")
             self.assertEqual(cmd.throttle, 0.0)
 
-    def test_short_dropout_keeps_forward_throttle(self):
-        ctl = AdaptiveController(CFG)
+    def test_short_dropout_does_not_accelerate_blind(self):
+        ctl = AdaptiveController(dict(CFG, lane_dropout_throttle_scale=0.65))
         lane = LaneEstimate(True, 112, 112, 0, 0, 1, "divider")
         for _ in range(4):
             moving = ctl.update(lane, 0, 224, 0.05)
         lost = LaneEstimate(False, 112, 112, 0, 1, 0, "lost")
         dropout = ctl.update(lost, 0, 224, 0.05)
-        self.assertGreater(dropout.throttle, moving.throttle)
+        self.assertLessEqual(dropout.throttle, moving.throttle)
         self.assertEqual(dropout.state, "slow:lane_dropout")
+
+    def test_curve_memory_brakes_fast_and_releases_slowly(self):
+        cfg = dict(CFG, throttle_cruise=0.23, throttle_max=0.32,
+                   throttle_step_up=1.0, throttle_step_down=1.0,
+                   throttle_target_alpha=1.0, curve_load_attack_alpha=0.8,
+                   curve_load_release_alpha=0.1)
+        ctl = AdaptiveController(cfg)
+        straight = LaneEstimate(True, 112, 112, 0, 0, 1, "divider")
+        ctl.update(straight, 0, 224, 0.05)
+        curve = LaneEstimate(True, 175, 150, 0.4, 0.7, 1, "divider")
+        corner = ctl.update(curve, 0, 224, 0.05)
+        exit_cmd = ctl.update(straight, 0, 224, 0.05)
+        self.assertLess(corner.throttle, cfg["throttle_max"])
+        self.assertLess(exit_cmd.throttle, cfg["throttle_max"])
+
+    def test_good_confidence_allows_max_speed_on_straight(self):
+        cfg = dict(CFG, throttle_cruise=0.75, throttle_max=1.0,
+                   throttle_step_up=1.0, throttle_step_down=1.0,
+                   confidence_full_speed=0.75,
+                   straight_boost_start=0.10, straight_boost_end=0.34)
+        ctl = AdaptiveController(cfg)
+        straight = LaneEstimate(True, 112, 112, 0, 0, 0.75, "divider")
+        command = ctl.update(straight, 0, 224, 0.05)
+        self.assertAlmostEqual(command.throttle, 1.0)
 
 
 if __name__ == "__main__":

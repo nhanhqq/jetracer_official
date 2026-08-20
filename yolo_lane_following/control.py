@@ -40,6 +40,8 @@ class AdaptiveController:
         self.last_steering = 0.0
         self.last_throttle = 0.0
         self.last_throttle_target = 0.0
+        self.filtered_derivative = 0.0
+        self.curve_load_ema = 0.0
         self.lost_frames = 0
         # The first valid segmentation is immediately usable.  Do not gate
         # driving behind a confirmation/lock period when entering a new area.
@@ -279,18 +281,32 @@ class AdaptiveController:
                 self.last_throttle, 0.0, c["throttle_step_up"], c["throttle_step_down"])
             return ControlCommand(self.last_steering, self.last_throttle, "stop:lane_lost")
 
-        # Once locked,
-        # a short dropout keeps max throttle instead of ramping down.
+        # A short segmentation dropout must not become a full-throttle event.
+        # Hold steering briefly and ease toward a conservative speed until the
+        # divider is visible again.  Accelerating while blind caused the car to
+        # leave the track before reacquisition could take effect.
         if not lane.valid:
+            dropout_scale = float(c.get("lane_dropout_throttle_scale", 0.70))
+            dropout_target = min(
+                float(c["throttle_cruise"]) * dropout_scale,
+                self.last_throttle_target if self.last_throttle_target > 0.0 else self.last_throttle,
+                self.last_throttle,
+            )
             self.last_throttle = self._approach(
-                self.last_throttle, c["throttle_max"], c["throttle_step_up"], c["throttle_step_down"]
+                self.last_throttle, dropout_target,
+                c["throttle_step_up"], c["throttle_step_down"]
             )
             return ControlCommand(self.last_steering, self.last_throttle, "slow:lane_dropout")
 
         error = (lane.target_x - width / 2.0) / max(1.0, width / 2.0)
         self.integral = float(np.clip(self.integral + error * dt, -0.5, 0.5))
         derivative = (error - self.last_error) / dt
-        raw = c["kp"] * error + c["ki"] * self.integral + c["kd"] * derivative + c["heading_gain"] * lane.heading_error
+        derivative_alpha = float(np.clip(c.get("derivative_alpha", 1.0), 0.0, 1.0))
+        self.filtered_derivative = (derivative_alpha * derivative +
+                                    (1.0 - derivative_alpha) * self.filtered_derivative)
+        raw = (c["kp"] * error + c["ki"] * self.integral +
+               c["kd"] * self.filtered_derivative +
+               c["heading_gain"] * lane.heading_error)
         raw = float(np.clip(raw, -c["max_steering"], c["max_steering"]))
         # Filter the target before applying the slew limit. Segmentation target
         # jitter can otherwise alternate the wheel direction at inference FPS.
@@ -321,9 +337,25 @@ class AdaptiveController:
         # curve-aware throttle. The competition setup can explicitly request
         # full throttle at all times; steering remains responsible for lane
         # following while throttle no longer hunts with segmentation noise.
-        curve_load = max(abs(filtered_raw), abs(lane.heading_error), abs(lane.curvature))
+        measured_curve_load = max(abs(filtered_raw), abs(lane.heading_error), abs(lane.curvature))
+        # Remember an approaching curve: react quickly when curvature rises,
+        # then release it slowly.  This brakes before/during the corner and
+        # prevents alternating fast/slow commands from frame-level mask noise.
+        curve_alpha = float(np.clip(
+            c.get("curve_load_attack_alpha", 0.65)
+            if measured_curve_load > self.curve_load_ema
+            else c.get("curve_load_release_alpha", 0.12), 0.0, 1.0))
+        self.curve_load_ema += curve_alpha * (measured_curve_load - self.curve_load_ema)
+        curve_load = self.curve_load_ema
         speed_scale = max(0.28, 1.0 - c["curve_slowdown"] * curve_load)
-        confidence_scale = c["low_confidence_slowdown"] + (1.0 - c["low_confidence_slowdown"]) * lane.confidence
+        # A good semantic mask should not hold back straight-line speed merely
+        # because the geometric confidence metric rarely reaches exactly 1.0.
+        # Above the configured threshold confidence has no speed penalty;
+        # below it, speed falls smoothly toward the safe floor.
+        confidence_full = max(1e-6, float(c.get("confidence_full_speed", 1.0)))
+        confidence_ratio = float(np.clip(lane.confidence / confidence_full, 0.0, 1.0))
+        confidence_scale = (c["low_confidence_slowdown"] +
+                            (1.0 - c["low_confidence_slowdown"]) * confidence_ratio)
         obstacle_scale = max(0.25, 1.0 - obstacle) if obstacle >= c["obstacle_slow_ratio"] else 1.0
         if lane.source == "avoid":
             obstacle_scale = min(obstacle_scale, c["avoidance_speed_scale"])
@@ -343,10 +375,17 @@ class AdaptiveController:
             target_throttle *= 1.0 - (1.0 - right_scale) * turn_fraction
         if bool(c.get("throttle_always_max", False)):
             target_throttle = float(c["throttle_max"])
-        target_alpha = float(np.clip(c.get("throttle_target_alpha", 0.35), 0.0, 1.0))
         if self.last_throttle_target <= 0.0:
             smoothed_target = target_throttle
         else:
+            # Drop the demand promptly for a detected curve, but restore speed
+            # slowly on corner exit.  Separate rates avoid both late braking
+            # and the fast/slow hunting produced by one symmetric filter.
+            target_alpha = float(np.clip(
+                c.get("throttle_target_brake_alpha", c.get("throttle_target_alpha", 0.35))
+                if target_throttle < self.last_throttle_target
+                else c.get("throttle_target_accel_alpha", c.get("throttle_target_alpha", 0.35)),
+                0.0, 1.0))
             smoothed_target = (target_alpha * target_throttle +
                                (1.0 - target_alpha) * self.last_throttle_target)
         throttle = self._approach(self.last_throttle, smoothed_target,

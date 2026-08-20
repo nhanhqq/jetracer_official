@@ -89,12 +89,18 @@ class YoloSemanticPerception:
         divider_lane = estimate_lane(masks["divider"], masks["road"],
                                      t["lookahead_ratio"], t["bottom_ratio"],
                                      t["roi_top_ratio"], t["min_mask_pixels"], "divider")
-        # Keep the planner contract stable, but pass an empty obstacle mask so
-        # no obstacle prediction can alter the target or controller state.
-        no_obstacles = np.zeros_like(masks["road"])
-        lane = plan_semantic_lane(masks["divider"], masks["road"], masks["forbidden"], no_obstacles,
-                                  t["lookahead_ratio"], t["bottom_ratio"], t["roi_top_ratio"],
-                                  t["min_mask_pixels"], t["vehicle_half_width"], divider_lane)
+        if bool(self.cfg["models"].get("lane_only", False)):
+            # This track has no obstacles: the segmented divider is the sole
+            # driving reference.  Do not let a noisy road/forbidden boundary
+            # reject a valid divider and send the controller into full-lock
+            # road reacquisition.
+            lane = divider_lane
+        else:
+            no_obstacles = np.zeros_like(masks["road"])
+            lane = plan_semantic_lane(
+                masks["divider"], masks["road"], masks["forbidden"], no_obstacles,
+                t["lookahead_ratio"], t["bottom_ratio"], t["roi_top_ratio"],
+                t["min_mask_pixels"], t["vehicle_half_width"], divider_lane)
         if lane.valid:
             if self.last_target_x is not None:
                 # Reject isolated segmentation jumps, but allow a real sharp
