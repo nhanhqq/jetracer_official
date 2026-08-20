@@ -20,7 +20,7 @@ semantic_classes:
 
 tracking:
   target_mode: divider       # keep camera centre on the physical divider
-  lookahead_ratio: 0.66   # compensate control latency at high speed
+  lookahead_ratio: 0.8   # compensate control latency at high speed
   bottom_ratio: 0.93
   roi_top_ratio: 0.45
   min_mask_pixels: 35
@@ -36,60 +36,82 @@ tracking:
   front_roi_right_ratio: 0.70
 
 control:
-  steering_gain: -0.65       # hardware calibration, inherited from notebook3
+  # GIỮ NGUYÊN steering/PID như cũ
+  steering_gain: -0.65
   steering_offset: 0.0
-  # Mechanical steering calibration. Positive is right in run.py; this car
-  # turns the left wheel too far on right commands, so limit that side first.
   steering_left_scale: 1.00
   steering_right_scale: 0.68
   max_steering_left: 1.00
   max_steering_right: 0.68
-  right_turn_throttle_scale: 0.70  # Keep full speed on straights; unload right turns
-  throttle_gain: 1.0         # 100% full motor power output
-  kp: 0.80
+
+  kp: 0.76                    # 0.80 -> 0.76
   ki: 0.01
-  kd: 0.14
-  heading_gain: 0.38
-  max_steering: 1.00         # Maximum steering lock (100% full wheel turn)
-  # Steering rate limit set to rapid response
-  max_steering_step: 0.10    # Smooth wheel slew; avoids snap/oscillation
+  kd: 0.15                    # 0.14 -> 0.15
+
+  heading_gain: 0.36
+
+  max_steering: 1.00
+  max_steering_step: 0.10
   maneuver_steering_step: 0.14
-  maneuver_throttle_step_up: 0.25      # 25% maneuver acceleration step
-  maneuver_throttle_step_down: 0.35    # 35% maneuver deceleration step
-  steering_target_alpha: 0.45 # Filter segmentation jitter before steering
+  steering_target_alpha: 0.45
   steering_direction_deadband: 0.08
   steering_reversal_confirm_frames: 3
   steering_reversal_force: 0.55
+
+  # CHỈ CHỈNH NHẸ THROTTLE
+  throttle_gain: 1.0
+
   throttle_min: 0.25
-  throttle_cruise: 0.65
-  throttle_max: 1.00         # Maximum hardware throttle (100%)
+  throttle_cruise: 0.69      # từ 0.65
+  throttle_max: 1.00
+
   throttle_limit_min: 0.10
   throttle_limit_max: 1.00
-  throttle_step_up: 0.25     # 25% throttle acceleration step per frame
-  throttle_step_down: 0.35   # 35% throttle deceleration step per frame
-  curve_slowdown: 0.50       # Reduce speed proportionally to steering demand
-  straight_boost_start: 0.35 # Boosts to 1.00 even on moderate curves (was 0.06)
-  straight_boost_end: 0.55   # End boost only on very sharp curves (was 0.22)
-  low_confidence_slowdown: 0.55
+
+  # cũ: 0.25 / 0.35
+  # giảm nhẹ để hết "drop" giật cục
+  throttle_step_up: 0.13
+  throttle_step_down: 0.18
+
+  maneuver_throttle_step_up: 0.14
+  maneuver_throttle_step_down: 0.18
+
+  # cũ 0.50 -> chỉ giảm nhẹ
+  curve_slowdown: 0.34
+
+  # cũ 0.70 -> tránh hụt ga mạnh khi cua phải
+  right_turn_throttle_scale: 0.84
+
+  # GIỮ vùng boost gần config cũ để behavior không đổi nhiều
+  straight_boost_start: 0.35
+  straight_boost_end: 0.55
+
+  low_confidence_slowdown: 0.65
+
   emergency_obstacle_ratio: 1.00
   obstacle_slow_ratio: 0.75
   avoidance_speed_scale: 0.80
-  # ESC needs a neutral command before changing from forward to reverse.
+
   reverse_neutral_time: 0.10
-  reverse_time: 0.10         # Extremely fast reverse duration
+  reverse_time: 0.10
   reverse_throttle: 0.35
-  recovery_steering: 1.00    
+
+  recovery_steering: 1.00
   recovery_throttle: 0.35
-  lane_reacquire_steering: 1.00 
+
+  lane_reacquire_steering: 1.00
   lane_reacquire_throttle: 0.40
+
   avoid_retry_time: 0.00
   avoid_hold_time: 0.00
+
   white_correct_time: 0.00
   white_side_correct_time: 0.00
   white_recovery_cooldown: 0.00
-  white_front_reverse_threshold: 1.00 # Ignore front white boundary unless 1.0
-  white_front_reverse_frames: 999  # Never reverse for white line front blockage
-  white_side_threshold: 1.00       # Ignore white side line boundary unless 1.0
+
+  white_front_reverse_threshold: 1.00
+  white_front_reverse_frames: 999
+  white_side_threshold: 1.00
   white_side_margin: 0.00
 
 competition:
