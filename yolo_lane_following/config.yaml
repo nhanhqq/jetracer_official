@@ -27,8 +27,6 @@ tracking:
   max_target_jump: 48.0  # reject spikes without delaying genuine sharp turns
   confidence_ema: 0.35
   max_lost_frames: 3
-  lane_lock_confirm_frames: 3
-  lane_lock_min_confidence: 0.55
   vehicle_half_width: 13
   road_hint_min_ratio: 0.005
   front_roi_top_ratio: 0.62
@@ -62,25 +60,30 @@ control:
   throttle_gain: 1.0
 
   throttle_min: 0.25
-  throttle_cruise: 0.69      # từ 0.65
+  throttle_cruise: 0.72      # tăng nhẹ tốc độ nền
   throttle_max: 1.00
+  throttle_always_max: true
 
   throttle_limit_min: 0.10
   throttle_limit_max: 1.00
 
   # cũ: 0.25 / 0.35
   # giảm nhẹ để hết "drop" giật cục
-  throttle_step_up: 0.13
-  throttle_step_down: 0.18
+  throttle_step_up: 0.08
+  throttle_step_down: 0.020
 
-  maneuver_throttle_step_up: 0.14
-  maneuver_throttle_step_down: 0.18
+  maneuver_throttle_step_up: 0.10
+  maneuver_throttle_step_down: 0.050
+
+  # Smooth the speed demand so one noisy segmentation/PID frame cannot unload
+  # the motor and create a throttle drop/judder.
+  throttle_target_alpha: 0.25
 
   # cũ 0.50 -> chỉ giảm nhẹ
-  curve_slowdown: 0.34
+  curve_slowdown: 0.30
 
   # cũ 0.70 -> tránh hụt ga mạnh khi cua phải
-  right_turn_throttle_scale: 0.84
+  right_turn_throttle_scale: 0.88
 
   # GIỮ vùng boost gần config cũ để behavior không đổi nhiều
   straight_boost_start: 0.35

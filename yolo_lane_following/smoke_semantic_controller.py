@@ -21,16 +21,14 @@ def main() -> None:
     parser.add_argument("--model", type=Path, required=True)
     parser.add_argument("--repeats", type=int, default=6)
     parser.add_argument("--preroll-image", type=Path,
-                        help="optional clear-lane frame used to acquire lane lock first")
+                        help="optional clear-lane frame used to warm up the controller")
     parser.add_argument("--preroll-repeats", type=int, default=3)
     args = parser.parse_args()
     cfg = load_config()
     cfg["models"]["semantic"] = str(args.model.resolve())
     perception = YoloSemanticPerception(cfg)
     controller = AdaptiveController(dict(
-        cfg["control"], max_lost_frames=cfg["tracking"]["max_lost_frames"],
-        lane_lock_confirm_frames=cfg["tracking"].get("lane_lock_confirm_frames", 1),
-        lane_lock_min_confidence=cfg["tracking"].get("lane_lock_min_confidence", 0.0)))
+        cfg["control"], max_lost_frames=cfg["tracking"]["max_lost_frames"]))
     def load_frame(path: Path):
         loaded = cv2.imread(str(path))
         if loaded is None:

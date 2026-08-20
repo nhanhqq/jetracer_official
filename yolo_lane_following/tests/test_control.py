@@ -85,7 +85,7 @@ class ControlTests(unittest.TestCase):
                       "neutral:white", "reverse:white",
                       "reacquire:road"):
             self.assertTrue(is_motor_command_state(state), state)
-        for state in ("reverse:obstacle", "stop:lane_lost", "wait:lane_lock",
+        for state in ("reverse:obstacle", "stop:lane_lost",
                       "slow:lane_dropout"):
             self.assertFalse(is_motor_command_state(state), state)
 
@@ -319,28 +319,22 @@ class ControlTests(unittest.TestCase):
             cmd = ctl.update(lost, 0, 224, 0.05)
         self.assertEqual(cmd.state, "stop:lane_lost")
 
-    def test_startup_never_accelerates_without_lane_lock(self):
+    def test_startup_stays_stopped_without_a_segmented_lane(self):
         ctl = AdaptiveController(CFG)
         lost = LaneEstimate(False, 112, 112, 0, 1, 0, "lost")
         for _ in range(3):
             cmd = ctl.update(lost, 0, 224, 0.05)
             self.assertEqual(cmd.throttle, 0)
-            self.assertEqual(cmd.state, "wait:lane_lock")
+            self.assertEqual(cmd.state, "stop:lane_lost")
 
-    def test_lane_lock_requires_persistent_confident_lane(self):
-        ctl = AdaptiveController(dict(CFG, lane_lock_confirm_frames=3,
-                                      lane_lock_min_confidence=0.55))
+    def test_first_valid_lane_starts_immediately(self):
+        ctl = AdaptiveController(dict(CFG))
         weak = LaneEstimate(True, 112, 112, 0, 0, 0.50, "divider")
-        for _ in range(4):
-            self.assertEqual(ctl.update(weak, 0, 224, 0.05).state, "wait:lane_lock")
-        strong = LaneEstimate(True, 112, 112, 0, 0, 0.80, "divider")
-        self.assertEqual(ctl.update(strong, 0, 224, 0.05).state, "wait:lane_lock")
-        self.assertEqual(ctl.update(strong, 0, 224, 0.05).state, "wait:lane_lock")
-        locked = ctl.update(strong, 0, 224, 0.05)
-        self.assertEqual(locked.state, "follow")
-        self.assertGreater(locked.throttle, 0)
+        command = ctl.update(weak, 0, 224, 0.05)
+        self.assertEqual(command.state, "follow")
+        self.assertGreater(command.throttle, 0)
 
-    def test_startup_ignores_white_and_obstacle_until_lane_lock(self):
+    def test_startup_stays_stopped_until_a_lane_is_segmented(self):
         lost = LaneEstimate(False, 112, 112, 0, 1, 0, "blocked")
         for inputs in (
                 dict(forbidden_left=0.8, forbidden_front=0.9),
@@ -348,10 +342,10 @@ class ControlTests(unittest.TestCase):
             ctl = AdaptiveController(CFG)
             obstacle = inputs.pop("obstacle", 0.0)
             cmd = ctl.update(lost, obstacle, 224, 0.05, **inputs)
-            self.assertEqual(cmd.state, "wait:lane_lock")
+            self.assertEqual(cmd.state, "stop:lane_lost")
             self.assertEqual(cmd.throttle, 0.0)
 
-    def test_short_dropout_decelerates_after_lane_lock(self):
+    def test_short_dropout_keeps_forward_throttle(self):
         ctl = AdaptiveController(CFG)
         lane = LaneEstimate(True, 112, 112, 0, 0, 1, "divider")
         for _ in range(4):

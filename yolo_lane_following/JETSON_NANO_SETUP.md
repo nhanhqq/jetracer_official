@@ -111,7 +111,7 @@ sudo systemctl restart nvargus-daemon
 ```
 
 For a normal start, leave `COMPETITION` off and ARM automatically selects `live`;
-driving starts as soon as lane lock and the controller state are safe. For the
+driving starts as soon as a valid lane segmentation and safe controller state are available. For the
 competition start, turn `COMPETITION` on, then ARM: inference starts but motor
 output remains blocked until a bright green circle is detected for three
 consecutive frames. Stop, disarming, or toggling the mode resets permission.

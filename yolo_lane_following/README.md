@@ -44,7 +44,7 @@ Trên replay 102 frame không có cube, engine mới có cùng median lane confi
 steering delta `0.16`; có 3 dropout đơn-frame được controller giảm ga mượt, trong
 khi engine gốc không dropout trên đoạn ngắn này.
 
-Smoke tích hợp dưới đây tạo lane lock bằng ảnh sạch, sau đó lặp ảnh cube để kiểm tra
+Smoke tích hợp dưới đây có thể dùng ảnh sạch để làm nóng controller, sau đó lặp ảnh cube để kiểm tra
 chuỗi model -> temporal confirmation -> planner -> controller mà không load motor:
 
 ```bash
@@ -169,7 +169,7 @@ TensorRT trên Jetson đích.
 
 Dry-run CSI trực tiếp trên Jetson Nano với engine cube FP16 hiện tại đạt `23.9 FPS`
 và median latency `41.8 ms` trên 709 frame. Camera lúc đo nhìn vào một phòng clutter,
-không phải sa bàn; dù obstacle risk lên `0.729`, lane-lock confirmation giữ `0`
+không phải sa bàn; dù obstacle risk lên `0.729`, lane segmentation vẫn được xử lý ngay
 throttle trên toàn bộ 709 frame. Đây là bằng chứng runtime/camera và fail-safe,
 chưa phải kiểm thử lái xe.
 
@@ -202,7 +202,7 @@ lưu trong `artifacts/live_validation/`. Chỉ coi validation đạt khi ảnh l
 đúng vật thật, không dựa riêng vào số risk.
 
 Trong notebook, `COMPETITION` tắt nghĩa là chỉ cần bật `ARM MOTOR`: notebook tự đổi
-sang `live` và xe chạy khi controller có lane-lock an toàn. Khi bật `COMPETITION`,
+sang `live` và xe chạy ngay khi controller nhận được lane segmentation hợp lệ. Khi bật `COMPETITION`,
 ARM cũng tự mở live nhưng motor vẫn dừng cho đến khi thấy hình tròn xanh lá sáng đủ
 3 frame liên tiếp; quyền start sau đó được latch đến khi Stop, bỏ ARM hoặc đổi chế độ.
 CSV ghi thêm `start_latency_ms`; detector xanh riêng lẻ đo median `1.236 ms`, p99

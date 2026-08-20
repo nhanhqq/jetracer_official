@@ -4,6 +4,7 @@ import csv
 import signal
 import statistics
 import sys
+import threading
 import time
 from pathlib import Path
 
@@ -16,6 +17,50 @@ if str(PROJECT_ROOT) not in sys.path:
 from yolo_lane_following.config import load_config, resolve_path
 from yolo_lane_following.control import AdaptiveController
 from yolo_lane_following.semantic_perception import YoloSemanticPerception
+
+
+class LatestFrameReader:
+    """Continuously read and retain only the newest OpenCV frame."""
+
+    def __init__(self, source):
+        self.capture = cv2.VideoCapture(source)
+        if not self.capture.isOpened():
+            raise RuntimeError(f"Cannot open source: {source}")
+        self.capture.set(cv2.CAP_PROP_BUFFERSIZE, 1)
+        self._lock = threading.Lock()
+        self._frame = None
+        self._sequence = 0
+        self._ended = False
+        self._stopping = False
+        self.thread = threading.Thread(target=self._read_loop, name="latest-frame-reader",
+                                       daemon=True)
+        self.thread.start()
+
+    def _read_loop(self):
+        while not self._stopping:
+            ok, frame = self.capture.read()
+            if not ok:
+                with self._lock:
+                    self._ended = True
+                return
+            with self._lock:
+                self._frame = frame
+                self._sequence += 1
+
+    def latest(self, after_sequence):
+        with self._lock:
+            if self._sequence == after_sequence:
+                return None, after_sequence, self._ended
+            return self._frame.copy(), self._sequence, self._ended
+
+    @property
+    def fps(self):
+        return self.capture.get(cv2.CAP_PROP_FPS)
+
+    def stop(self):
+        self._stopping = True
+        self.capture.release()
+        self.thread.join(timeout=1.0)
 
 
 class CarOutput:
@@ -77,14 +122,12 @@ def main() -> None:
     controller_cfg = dict(
         cfg["control"],
         max_lost_frames=cfg["tracking"]["max_lost_frames"],
-        lane_lock_confirm_frames=cfg["tracking"].get("lane_lock_confirm_frames", 1),
-        lane_lock_min_confidence=cfg["tracking"].get("lane_lock_min_confidence", 0.0),
         lane_only=cfg["models"].get("lane_only", True),
     )
     controller = AdaptiveController(controller_cfg)
 
     camera = None
-    capture = None
+    reader = None
     if args.source == "camera":
         from jetcam.csi_camera import CSICamera
         c = cfg["camera"]
@@ -92,17 +135,17 @@ def main() -> None:
         camera.running = True
     else:
         source = int(args.source) if args.source.isdigit() else args.source
-        capture = cv2.VideoCapture(source)
-        if not capture.isOpened():
-            raise RuntimeError(f"Cannot open source: {args.source}")
-        # Do not let a slow inference loop accumulate stale frames.
-        capture.set(cv2.CAP_PROP_BUFFERSIZE, 1)
+        # Read in a background thread and keep only the newest frame. This
+        # prevents model latency from turning the control loop into a replay of
+        # stale buffered frames.
+        reader = LatestFrameReader(source)
 
     log_dir = resolve_path(cfg, cfg["runtime"]["log_dir"])
     log_dir.mkdir(parents=True, exist_ok=True)
     log_path = log_dir / time.strftime("run_%Y%m%d_%H%M%S.csv")
     stopping = False
     video_writer = None
+    reader_sequence = 0
 
     def request_stop(*_):
         nonlocal stopping
@@ -128,13 +171,12 @@ def main() -> None:
                     frame = latest.copy() if latest is not None else None
                     ok = frame is not None
                 else:
-                    # CAP_PROP_BUFFERSIZE is not honoured by every backend;
-                    # discard any frames already queued before retrieving the
-                    # one that will be used for control.
-                    capture.grab()
-                    ok, frame = capture.read()
-                if not ok:
-                    break
+                    frame, reader_sequence, ended = reader.latest(reader_sequence)
+                    if frame is None:
+                        if ended:
+                            break
+                        time.sleep(0.001)
+                        continue
                 # Match the live CSI path: semantic inference, geometry and
                 # control all operate on the configured 224x224 frame. Feeding
                 # a 1280x720 replay here made postprocessing needlessly resize
@@ -157,7 +199,7 @@ def main() -> None:
                 if args.output_video:
                     if video_writer is None:
                         args.output_video.parent.mkdir(parents=True, exist_ok=True)
-                        source_fps = capture.get(cv2.CAP_PROP_FPS) if capture is not None else cfg["camera"]["capture_fps"]
+                        source_fps = reader.fps if reader is not None else cfg["camera"]["capture_fps"]
                         if not source_fps or source_fps <= 0:
                             source_fps = 20.0
                         video_writer = cv2.VideoWriter(
@@ -187,8 +229,8 @@ def main() -> None:
                 writer.writerows(rows)
             if camera is not None:
                 camera.running = False
-            if capture is not None:
-                capture.release()
+            if reader is not None:
+                reader.stop()
             if video_writer is not None:
                 video_writer.release()
             if args.display:
