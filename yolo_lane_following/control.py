@@ -350,6 +350,11 @@ class AdaptiveController:
         raw = (c["kp"] * error + c["ki"] * self.integral +
                c["kd"] * self.filtered_derivative +
                c["heading_gain"] * lane.heading_error)
+        # A right-hand curve needs an earlier turn-in on this chassis. Apply
+        # the configurable anticipation only while the requested turn is
+        # right; left steering and all pre-corner speed braking stay unchanged.
+        if raw > 0.0:
+            raw *= float(c.get("right_turn_anticipation_scale", 1.0))
         raw = float(np.clip(raw, -c["max_steering"], c["max_steering"]))
         # Filter the target before applying the slew limit. Segmentation target
         # jitter can otherwise alternate the wheel direction at inference FPS.

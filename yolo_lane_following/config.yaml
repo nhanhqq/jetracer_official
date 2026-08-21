@@ -44,9 +44,11 @@ control:
   steering_gain: -0.65
   steering_offset: 0.0
   steering_left_scale: 1.00
-  steering_right_scale: 0.70
+  steering_right_scale: 0.82
   max_steering_left: 0.90
-  max_steering_right: 0.64
+  max_steering_right: 0.74
+  # Start responding to a detected right curve before its lateral error grows.
+  right_turn_anticipation_scale: 1.10
 
   kp: 0.60
   ki: 0.00
@@ -76,13 +78,13 @@ control:
   # Requested for vehicle test: allow the straight-line scheduler to reach the
   # hardware-normalised maximum. Curve/corner and right-turn limits remain.
   throttle_cruise: 1.00
-  throttle_max: 1.00
+  throttle_max: 1.10
   # Maximum speed is only reached on a stable straight. Never bypass the
   # curve/confidence/right-turn safety scheduler.
   throttle_always_max: false
 
   throttle_limit_min: 0.20
-  throttle_limit_max: 1.00
+  throttle_limit_max: 1.10
 
   throttle_step_up: 0.045
   throttle_step_down: 0.045
@@ -100,17 +102,18 @@ control:
   curve_slowdown: 0.58
   curve_curve_load: 0.40
   corner_curve_load: 0.62
-  curve_throttle: 0.44
+  curve_throttle: 0.70
   # A valid divider through a sharp curve must keep the car moving slowly.
   # Zero here made a high-confidence `follow` state stop on this track.
-  corner_throttle: 0.40
+  corner_throttle: 0.64
   curve_load_attack_alpha: 0.80
   curve_load_release_alpha: 0.15
 
-  right_turn_throttle_scale: 0.70
+  right_turn_throttle_scale: 0.75
 
-  straight_boost_start: 0.10
-  straight_boost_end: 0.34
+  # A short boost window gives only a settled straight the extra speed.
+  straight_boost_start: 0.08
+  straight_boost_end: 0.22
 
   low_confidence_slowdown: 0.58
   confidence_full_speed: 0.75

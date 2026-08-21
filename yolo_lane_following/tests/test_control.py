@@ -142,6 +142,18 @@ class ControlTests(unittest.TestCase):
         self.assertGreater(cmd.steering, 0)
         self.assertGreater(cmd.throttle, 0)
 
+    def test_right_turn_anticipation_only_increases_right_turn_in(self):
+        cfg = dict(CFG, kd=0.0, steering_target_alpha=1.0,
+                   steering_rate=100.0, right_turn_anticipation_scale=1.10)
+        right = LaneEstimate(True, 145, 112, 0.0, 0.0, 1.0, "divider")
+        left = LaneEstimate(True, 79, 112, 0.0, 0.0, 1.0, "divider")
+        anticipated_right = AdaptiveController(dict(cfg)).update(right, 0.0, 224, 0.05)
+        base_right = AdaptiveController(dict(cfg, right_turn_anticipation_scale=1.0)).update(right, 0.0, 224, 0.05)
+        anticipated_left = AdaptiveController(dict(cfg)).update(left, 0.0, 224, 0.05)
+        base_left = AdaptiveController(dict(cfg, right_turn_anticipation_scale=1.0)).update(left, 0.0, 224, 0.05)
+        self.assertAlmostEqual(anticipated_right.steering, base_right.steering * 1.10)
+        self.assertAlmostEqual(anticipated_left.steering, base_left.steering)
+
     def test_straight_reaches_higher_target_than_curve(self):
         cfg = dict(CFG, throttle_cruise=0.23, throttle_max=0.32,
                    throttle_step_up=1.0, throttle_step_down=1.0,
