@@ -43,6 +43,16 @@ class GeometryTests(unittest.TestCase):
         self.assertGreater(lane.target_x, 120)
         self.assertLess(lane.target_x, 140)
 
+    def test_three_parallel_dividers_selects_the_spatial_middle(self):
+        divider = np.zeros((224, 224), np.uint8)
+        # The camera-facing orange divider is centred between two tempting
+        # parallel edge markings.  Divider mode must not select either edge.
+        for x in (38, 112, 186):
+            divider[96:224, x - 2:x + 3] = 255
+        lane = estimate_lane(divider, np.zeros_like(divider), target_mode="divider")
+        self.assertTrue(lane.valid)
+        self.assertAlmostEqual(lane.target_x, 112.0, delta=2.0)
+
     def test_strict_divider_mode_does_not_invent_lane_from_road(self):
         road = np.zeros((224, 224), np.uint8); road[100:, 30:190] = 255
         self.assertFalse(estimate_lane(np.zeros_like(road), road, target_mode="divider").valid)

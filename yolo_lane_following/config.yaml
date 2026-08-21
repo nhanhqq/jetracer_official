@@ -44,16 +44,16 @@ control:
   steering_gain: -0.65
   steering_offset: 0.0
   steering_left_scale: 1.00
-  steering_right_scale: 0.68
+  steering_right_scale: 0.70
   max_steering_left: 0.90
-  max_steering_right: 0.62
+  max_steering_right: 0.64
 
-  kp: 0.56
+  kp: 0.60
   ki: 0.00
   kd: 0.035
   derivative_alpha: 0.20
 
-  heading_gain: 0.30
+  heading_gain: 0.34
 
   max_steering: 1.00
   # All live slew/reversal values are wall-clock based, so a Nano FPS dip does
@@ -72,7 +72,7 @@ control:
   # Keep enough motor torque to avoid cogging/stall, while leaving a real gap
   # below straight-line maximum speed.
   throttle_min: 0.44  # legacy/fixed manoeuvre fallback; not a corner speed floor
-  throttle_motion_min: 0.44
+  throttle_motion_min: 0.40
   # Requested for vehicle test: allow the straight-line scheduler to reach the
   # hardware-normalised maximum. Curve/corner and right-turn limits remain.
   throttle_cruise: 1.00
@@ -100,8 +100,10 @@ control:
   curve_slowdown: 0.58
   curve_curve_load: 0.40
   corner_curve_load: 0.62
-  curve_throttle: 0.48
-  corner_throttle: 0.00
+  curve_throttle: 0.44
+  # A valid divider through a sharp curve must keep the car moving slowly.
+  # Zero here made a high-confidence `follow` state stop on this track.
+  corner_throttle: 0.40
   curve_load_attack_alpha: 0.80
   curve_load_release_alpha: 0.15
 
